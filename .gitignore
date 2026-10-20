@@ -1,0 +1,4 @@
+# board data: database (machine settings, env values, run history), logs, junit reports
+.pytest-board/
+__pycache__/
+*.pyc
