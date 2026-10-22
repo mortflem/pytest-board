@@ -15,8 +15,7 @@ WorkingDirectory=/opt/pytest-board
 Environment=PYTEST_BOARD_TOKEN=change-me
 ExecStart=/usr/bin/python3 /opt/pytest-board/server.py \
     --root /home/tester/my-project \
-    --pytest "/home/tester/my-project/.venv/bin/python -m pytest" \
-    --host 0.0.0.0 --port 8765 --workers 2
+    --host 0.0.0.0 --port 8765
 # headlines are read from /home/tester/my-project/pytest-board.ini by default;
 # add  --groups /etc/pytest-board/headlines.ini  above to keep the file elsewhere
 Restart=on-failure

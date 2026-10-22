@@ -2,3 +2,7 @@
 .pytest-board/
 __pycache__/
 *.pyc
+# .env files hold variables for test runs, often secrets (see README, "Environment variables and .env files")
+.env
+*.env
+pytest-board.ini

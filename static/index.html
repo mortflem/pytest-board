@@ -51,6 +51,7 @@ header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var
 .icon:hover{background:var(--surface-2);color:var(--text)}
 .offline{background:var(--failed);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;display:none}
 body.is-offline .offline{display:inline-block}
+.stale{background:var(--queued);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;cursor:help}
 
 /* ---------- library column */
 .workspace{flex:1;display:flex;min-height:0}
@@ -61,6 +62,18 @@ body.is-dragging .library.accepting{outline:2px dashed var(--border-strong);outl
 .lib-head .count{background:var(--surface);border-radius:999px;padding:0 8px;font-weight:600}
 .lib-tools{display:flex;gap:6px;padding:10px 16px 6px}
 .lib-tools .btn{padding:4px 10px;font-size:12.5px;flex:1;justify-content:center}
+.disc-wrap{position:relative;flex:1;display:flex;min-width:0}
+.btn .dcaret{width:11px;height:11px;margin-left:2px;opacity:.7}
+/* "Discover" menu: one entry per machine */
+.menu{position:absolute;top:calc(100% + 4px);right:0;min-width:230px;max-width:calc(100vw - 24px);z-index:40;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-lg);padding:4px;display:flex;flex-direction:column}
+.menu .mh{font-size:11px;font-weight:700;color:var(--faint);padding:5px 10px 4px;text-transform:uppercase;letter-spacing:.04em}
+.menu .mi{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;padding:6px 10px;border:0;background:none;
+  border-radius:6px;text-align:left;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+.menu .mi:hover,.menu .mi:focus-visible{background:var(--accent-soft);outline:none}
+.menu .mi .st{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.menu .mi.st-online .st{background:var(--passed)} .menu .mi.st-warn .st{background:var(--queued)} .menu .mi.st-offline .st{background:var(--failed)}
+.menu .mi .where{grid-column:2;font:11px var(--mono);color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lib-search{margin:4px 16px 8px;width:auto!important;background:var(--surface)!important}
 .lib-list{flex:1;overflow:auto;padding:4px 16px 12px;display:flex;flex-direction:column;gap:8px}
 .lib-foot{padding:10px 16px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border)}
@@ -107,9 +120,8 @@ aside.min .side-toggle svg{transform:rotate(180deg)}
 aside.min:hover{background:var(--surface)}
 aside.min.over{background:var(--accent-soft)}
 .machines .lib-head .dot{background:var(--mach)}
-.mach-item{background:var(--surface);border-radius:6px;padding:8px 10px;box-shadow:var(--shadow);cursor:grab;border-left:3px solid var(--st);font-size:12px;--st:var(--faint)}
+.mach-item{background:var(--surface);border-radius:6px;padding:8px 10px;box-shadow:var(--shadow);cursor:pointer;border-left:3px solid var(--st);font-size:12px;--st:var(--faint)}
 .mach-item:hover{box-shadow:var(--shadow),0 0 0 1px var(--mach)}
-.mach-item.lifting{outline:2px solid var(--mach)}
 .mach-item.st-online{--st:var(--passed)} .mach-item.st-warn{--st:var(--queued)} .mach-item.st-offline{--st:var(--failed)} .mach-item.st-checking{--st:var(--running)}
 .mi-top{display:flex;align-items:center;gap:6px}
 .sdot{width:8px;height:8px;border-radius:50%;background:var(--st);flex:none}
@@ -120,28 +132,22 @@ aside.min.over{background:var(--accent-soft)}
 .mi-line{color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mi-status{margin-top:4px;color:var(--faint);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .st-offline .mi-status{color:var(--failed)} .st-warn .mi-status{color:var(--queued)}
-.slots{display:flex;gap:2px;margin-left:auto}
-.slots i{width:6px;height:10px;border-radius:1px;background:var(--border-strong)}
-.slots i.on{background:var(--running)}
+.mi-run{margin-top:4px;color:var(--running);font-size:11.5px;font-weight:600;display:flex;align-items:center;gap:4px;min-width:0}
+.mi-run svg{width:11px;height:11px;flex:none}
+.mi-run span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mpill{display:inline-flex;align-items:center;gap:3px;font:600 10.5px/1 var(--mono);color:var(--mach);background:color-mix(in srgb,var(--mach) 12%,transparent);border-radius:3px;padding:3px 5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .mpill svg{width:11px;height:11px;flex:none}
 .mpill.inherit{background:transparent;border:1px dashed color-mix(in srgb,var(--mach) 45%,transparent)}
 .mpill.missing{color:var(--failed);background:var(--failed-soft)}
-body.machine-drag .card,body.machine-drag .lib-item{outline:1px dashed var(--mach);outline-offset:1px}
-.mdrop{outline:2px solid var(--mach)!important;background:color-mix(in srgb,var(--mach) 10%,var(--surface))!important}
+.bpill{display:inline-flex;align-items:center;gap:3px;font:600 10.5px/1 var(--mono);color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent);border-radius:3px;padding:3px 5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.bpill svg{width:11px;height:11px;flex:none}
+.bpill.inherit{background:transparent;border:1px dashed var(--border-strong)}
 #machDlg{width:640px}
 .mstat{border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:12.5px;background:var(--surface-2);display:flex;gap:8px;align-items:flex-start;--st:var(--faint)}
 .mstat.st-online{--st:var(--passed)} .mstat.st-warn{--st:var(--queued)} .mstat.st-offline{--st:var(--failed)} .mstat.st-checking{--st:var(--running)}
 .mstat .sdot{margin-top:4px}
 .ro-note{font-size:12px;background:var(--queued-soft);color:var(--queued);border-radius:6px;padding:8px 10px;margin-bottom:12px}
 .check{display:flex;gap:8px;align-items:center;font-size:13px}
-.lib-mrow{display:flex;align-items:center;gap:5px;margin-top:6px;color:var(--mach)}
-.lib-mrow svg{width:12px;height:12px;flex:none}
-.lib-mach{flex:1;min-width:0;font:600 11.5px/1.2 var(--mono);color:var(--mach);background:color-mix(in srgb,var(--mach) 8%,var(--surface));
-  border:1px solid color-mix(in srgb,var(--mach) 30%,var(--border));border-radius:4px;padding:3px 4px;cursor:pointer;text-overflow:ellipsis}
-.lib-mach.inherit{font-weight:400;border-style:dashed}
-.lib-mach.missing{color:var(--failed);border-color:var(--failed)}
-.lib-mach:focus{outline:2px solid var(--mach);outline-offset:1px}
 .col-head .clear{font-size:11px;text-transform:none;letter-spacing:0;font-weight:500;padding:1px 6px;margin-left:4px}
 .card .from{color:var(--faint);font-size:11px;display:inline-flex;align-items:center;gap:3px}
 .card .from svg{width:11px;height:11px}
@@ -156,6 +162,7 @@ main{flex:1;overflow:auto;padding:0 16px 24px;min-width:0}
 .backlog{--c:var(--backlog)} .scheduled{--c:var(--scheduled)} .queued{--c:var(--queued)}
 .running{--c:var(--running)} .passed{--c:var(--passed)} .failed{--c:var(--failed)}
 
+.board-empty{grid-column:1/-1;margin:18px 4px;padding:22px;border:1px dashed var(--border-strong);border-radius:8px;color:var(--muted);text-align:center;line-height:1.6}
 .lane-head{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:14px 4px 6px;position:sticky;left:0}
 .lane-head .caret{transition:transform .15s}
 .lane-head.collapsed .caret{transform:rotate(-90deg)}
@@ -185,6 +192,10 @@ button.lane-name{cursor:pointer} button.lane-name:hover{background:var(--surface
 .tgroups .tgroup{min-width:0;margin:0;padding:2px 2px 3px;gap:3px;border-radius:6px;position:relative;
   background:hsl(var(--th) 80% 50% / .07)}
 .tgroups .tgroup.none{background:var(--surface-2)}
+.tgroups .tgroup.multi{background:color-mix(in srgb,var(--muted) 8%,transparent)}
+.tbadge.multi{color:var(--text);background:color-mix(in srgb,var(--muted) 10%,transparent)}
+.tbadge.multi .odots{margin-right:4px}
+.tgroups .tbadge.multi .odots{margin-right:2px}
 .tgroups .tgroup+.tgroup{border-top:0;padding-top:3px}
 .tgroups .tg-head{min-height:16px;gap:3px;justify-content:center}
 .tgroups .tbadge{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;padding:2px 3px;font-size:10.5px;background:transparent}
@@ -203,14 +214,34 @@ button.lane-name{cursor:pointer} button.lane-name:hover{background:var(--surface
 .optrow:last-child{border-bottom:0}
 .optrow:hover{background:var(--surface-2)}
 .optrow code{font:12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
-.optrow .sw{width:10px;height:10px;border-radius:3px;background:hsl(var(--th) 70% 50%)}
+.optrow .sw{width:10px;height:10px;border-radius:50%;background:hsl(var(--th) 70% 50%)}
+/* one coloured dot per option a card runs with (same colours as in the "Run … with" dialog) */
+.odots{display:inline-flex;gap:3px;align-items:center;vertical-align:middle;flex:none}
+.odot{--th:0;width:9px;height:9px;border-radius:50%;background:hsl(var(--th) 70% 50%);flex:none}
+.odot.other{background:transparent;box-shadow:inset 0 0 0 1.5px var(--border-strong)}
+.card.mini .odots{margin-right:4px}
+.card.mini .odot{width:7px;height:7px}
 .optrow.none .sw{background:var(--border-strong)} .optrow.none .ol{color:var(--muted)}
 .optrow .ol{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #optDlg .preview b{font-family:var(--mono);font-weight:600}
 .lane-sum{display:flex;gap:6px;font-size:12px;color:var(--muted)}
 .lane-sum span{display:inline-flex;align-items:center;gap:4px}
 .lane-actions{display:flex;gap:2px;opacity:.55;transition:opacity .15s}
+.cell .more{display:block;width:100%;margin-top:2px;padding:6px 8px;border:1px dashed var(--border-strong);border-radius:6px;background:none;
+  color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;line-height:1.2;cursor:pointer;text-align:center}
+.cell .more:hover,.cell .more:focus-visible{color:var(--text);border-color:var(--accent);background:var(--accent-soft);outline:none}
 .lane-head:hover .lane-actions{opacity:1}
+/* Passed / Failed: the cards of one test as a stack (paper layers behind the newest card) */
+.stack{display:flex;flex-direction:column;gap:6px;flex:none}
+.stack:not(.open)>.card{--layers:3px 3px 0 -1px var(--surface),3px 3px 0 0 var(--border-strong);box-shadow:var(--shadow),var(--layers);margin:0 4px 4px 0}
+.stack.deep:not(.open)>.card{--layers:3px 3px 0 -1px var(--surface),3px 3px 0 0 var(--border-strong),6px 6px 0 -1px var(--surface),6px 6px 0 0 var(--border-strong);margin:0 7px 7px 0}
+.stack:not(.open)>.card:hover{box-shadow:var(--shadow),0 0 0 1px var(--border-strong),var(--layers)}
+.stack.open{padding:4px;border:1px dashed var(--border-strong);border-radius:8px}
+.stack-n{flex:none;display:inline-flex;align-items:center;gap:1px;margin-left:auto;padding:0 3px 0 7px;border:1px solid var(--border-strong);border-radius:10px;
+  background:var(--surface-2);color:var(--muted);font:inherit;font-size:11.5px;font-weight:600;line-height:16px;cursor:pointer}
+.stack-n:hover,.stack-n:focus-visible{color:var(--text);border-color:var(--accent);background:var(--accent-soft);outline:none}
+.stack-n svg{width:12px;height:12px;transform:rotate(-90deg);transition:transform .15s}
+.stack.open .stack-n svg{transform:none}
 .cell{background:var(--lane);border:1px solid var(--border);border-radius:8px;min-height:84px;padding:6px;display:flex;flex-direction:column;gap:6px;transition:background .12s,border-color .12s}
 body.is-dragging .cell.allowed{border-style:dashed;border-color:var(--border-strong)}
 body.is-dragging .cell.blocked{opacity:.45}
@@ -236,6 +267,8 @@ body.is-dragging .cell.blocked{opacity:.45}
 .pill.run{background:var(--running-soft);color:var(--running)}
 .pill.sch{background:var(--scheduled-soft);color:var(--scheduled)}
 .pill.q{background:var(--queued-soft);color:var(--queued)}
+.pill.warn{background:var(--queued-soft);color:var(--queued);font-weight:600}
+.mini-meta .warn{color:var(--queued);display:inline-flex;align-items:center;gap:2px}
 .progress{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden;border-radius:0 0 6px 6px}
 .progress::after{content:"";position:absolute;inset:0;width:40%;background:var(--running);animation:slide 1.2s ease-in-out infinite}
 @keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
@@ -266,7 +299,21 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
 .preview.err{color:var(--failed)}
 .cmd{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;word-break:break-all;color:var(--muted)}
 
-#cardDlg{width:1100px;height:min(760px,calc(100vh - 40px))}
+#cardDlg{width:1100px;height:min(760px,calc(100vh - 40px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:hidden}
+/* movable, resizable dialogs: drag the title bar to move, an edge or a corner to resize */
+.rz{position:absolute;z-index:5;touch-action:none}
+.rz.n,.rz.s{left:10px;right:10px;height:6px;cursor:ns-resize}.rz.n{top:0}.rz.s{bottom:0}
+.rz.e,.rz.w{top:10px;bottom:10px;width:6px;cursor:ew-resize}.rz.e{right:0}.rz.w{left:0}
+.rz.ne,.rz.nw,.rz.se,.rz.sw{width:14px;height:14px}
+.rz.ne{top:0;right:0;cursor:nesw-resize}.rz.sw{bottom:0;left:0;cursor:nesw-resize}
+.rz.nw{top:0;left:0;cursor:nwse-resize}.rz.se{bottom:0;right:0;cursor:nwse-resize}
+.rz.se::after{content:"";position:absolute;right:3px;bottom:3px;width:8px;height:8px;opacity:.55;
+  background:linear-gradient(135deg,transparent 45%,var(--muted) 45%,var(--muted) 55%,transparent 55%,transparent 70%,var(--muted) 70%,var(--muted) 80%,transparent 80%)}
+.rz.se:hover::after{opacity:1}
+body.resizing{user-select:none;-webkit-user-select:none}
+.dlg-head.drag-handle{cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+.dlg-head.drag-handle button{cursor:pointer}
+body.resizing *{cursor:inherit!important}
 #cardDlg[open]{display:flex;flex-direction:column}
 .card-grid{display:grid;grid-template-columns:340px 1fr;flex:1;min-height:0}
 .card-grid>div{overflow:auto}
@@ -286,7 +333,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
 
 #discDlg{width:760px}
 #helpDlg{width:820px}
-#shellDlg{width:min(1100px,calc(100vw - 32px))}
+#shellDlg{width:min(1100px,calc(100vw - 32px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:hidden}
 #shellDlg[open]{display:flex;flex-direction:column;height:min(720px,calc(100vh - 40px))}
 #shTerm{flex:1;min-height:0}
 .sh-dest{font:12px var(--mono);color:var(--muted)}
@@ -338,6 +385,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
   </div>
   <div class="info" id="info"></div>
   <span class="offline">server unreachable — retrying</span>
+  <span class="stale" id="staleServer" hidden title="The files were updated, but the running board server is the previous version">board server needs a restart</span>
   <select class="gsel" id="grpFilter" title="Show one headline only"><option value="*">All headlines</option></select>
   <input class="search" id="search" placeholder="Filter cards…" autocomplete="off">
   <button class="btn" id="btnHelp" title="How to set up ssh keys for machines"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.75c-.5.22-.8.6-.8 1.15v.4"/><path d="M8 11.4h.01" stroke-width="2.2" stroke-linecap="round"/></svg>Help setup</button>
@@ -350,13 +398,14 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
       <button class="btn" id="btnCheckAll" title="Test the SSH connection to every machine">Check all</button>
     </div>
     <div class="lib-list" id="machList"></div>
-    <div class="lib-foot">Each machine is a <b>swimlane</b> on the board: drag a card into another machine's lane to run it there. You can also drag a machine onto a <b>card</b> or a <b>library test</b>. Machines are reached with <span class="mono">ssh</span> using key-based login: <button class="help-link" data-help>Help setup</button>.</div>
+    <div class="lib-foot">Each machine is a <b>swimlane</b> on the board: drag a card into another machine's lane to run it there. Machines are reached with <span class="mono">ssh</span> using key-based login: <button class="help-link" data-help>Help setup</button>.</div>
   </aside>
   <aside class="library" id="library">
     <div class="lib-head"><span class="dot"></span>Test library<span class="count" id="libCount">0</span><button class="icon side-toggle" title="Minimise" aria-label="Minimise Test library"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button></div>
     <div class="lib-tools">
       <button class="btn primary" id="btnTest"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>New test</button>
-      <button class="btn" id="btnDiscover"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Discover</button>
+      <div class="disc-wrap"><button class="btn" id="btnDiscover" aria-haspopup="menu" aria-expanded="false" title="Find tests on a machine and add them to the library"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Discover<svg class="dcaret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></button>
+        <div class="menu" id="discMenu" role="menu" hidden></div></div>
     </div>
     <input class="search lib-search" id="libSearch" placeholder="Filter library…" autocomplete="off">
     <div class="lib-list" id="libList"></div>
@@ -367,15 +416,16 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
 </div>
 <div class="toast" id="toast"></div>
 
-<!-- option sets dialog (putting a library test on the board): one card per ticked option set -->
+<!-- option sets dialog (putting a library test on the board): one card with every ticked option -->
 <dialog id="optDlg">
   <form method="dialog" style="width:580px">
     <div class="dlg-head"><span style="display:inline-flex;color:var(--accent)" id="odIcon"></span><h2 id="odHead">Option sets</h2></div>
     <div class="dlg-body">
       <p class="help-intro" id="odIntro"></p>
       <div class="optlist" id="odList"></div>
-      <div class="field"><label for="odExtra">More option sets, one per line</label>
-        <textarea id="odExtra" class="mono" rows="2" placeholder="-m smoke --lf&#10;-k login -x"></textarea>
+      <div class="field"><label for="odArgs">Extra arguments</label>
+        <input id="odArgs" class="mono" placeholder="e.g. --set_temperature 0 10 20" autocomplete="off" spellcheck="false">
+        <small>Added as they are to the card's pytest command (they go in its <i>Extra pytest args</i>).</small>
         <small id="odHint"></small></div>
       <div class="preview" id="odPreview"></div>
     </div>
@@ -412,7 +462,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <div class="left">
       <div class="field"><label for="fTitle" id="lblTitle">Title</label><input id="fTitle" placeholder="Checkout smoke"></div>
       <div class="field"><label for="fGroup">Headline</label><select id="fGroup"></select></div>
-      <div class="field"><label for="fMachine">Machine (swimlane)</label><select id="fMachine"></select><small id="fMachineInfo"></small></div>
+      <div class="field" id="fMachineWrap"><label for="fMachine">Machine (swimlane)</label><select id="fMachine"></select><small id="fMachineInfo"></small></div>
       <div class="field"><label for="fTarget">Target</label><input id="fTarget" class="mono" placeholder="tests/test_checkout.py  or  tests/api  or  tests/x.py::test_y">
         <small>Files, folders or node IDs, relative to the project root. Empty = whole suite.</small></div>
       <div class="field"><label for="fArgs">Extra pytest args</label><input id="fArgs" class="mono" placeholder='-m "not slow" -x -n 4'></div>
@@ -421,6 +471,8 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
         <div class="field"><label for="fTimeout">Timeout (s)</label><input id="fTimeout" type="number" min="0" placeholder="none"></div>
         <div class="field" id="fOptWrap" style="flex:2"><label for="fOpt">Option set</label><input id="fOpt" class="mono" placeholder="none, e.g. -m smoke -x" autocomplete="off"></div>
       </div>
+      <div class="field" id="fBranchWrap"><label for="fBranch">Git branch</label><input id="fBranch" class="mono" placeholder="none: the project folder as it is" autocomplete="off" spellcheck="false">
+        <small id="fBranchInfo"></small></div>
       <div class="field" id="cdSchedWrap"><label>Schedule</label><div id="cdSched" class="preview"></div></div>
       <div class="field"><label>Command</label><div class="cmd mono" id="cdCmd">—</div></div>
     </div>
@@ -436,9 +488,10 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <button class="btn" id="cdSaveLib" style="margin-right:auto" title="Add a copy of this card's settings to the test library">Save to library</button>
     <span id="cdFootSpacer" style="margin-right:auto"></span>
     <button class="btn" id="cdSchedule">Schedule…</button>
+    <button class="btn" id="cdAttach" hidden>Attach</button>
     <button class="btn" id="cdStop">Stop</button>
     <button class="btn" id="cdRun">Run now</button>
-    <button class="btn primary" id="cdSave">Save</button>
+    <button class="btn primary" id="cdSave">Save and close</button>
   </div>
 </dialog>
 
@@ -457,7 +510,6 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <div class="row">
       <div class="field"><label for="mUser">SSH user</label><input id="mUser" class="mono" placeholder="(from ~/.ssh/config)" autocomplete="off"></div>
       <div class="field" style="flex:0 0 90px"><label for="mPort">Port</label><input id="mPort" type="number" min="1" max="65535" placeholder="22"></div>
-      <div class="field" style="flex:0 0 90px"><label for="mSlots">Slots</label><input id="mSlots" type="number" min="1" max="64" placeholder="1"></div>
     </div>
     <div class="field"><label for="mIdentity">Private key file</label><input id="mIdentity" class="mono" placeholder="~/.ssh/id_ed25519 (optional)" autocomplete="off">
       <small>Key-based login only: the board never asks for passwords. The key file lives on this server. <button class="help-link" id="mdHelp" type="button">How do I set up a key?</button></small></div>
@@ -468,6 +520,12 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
       <small>e.g. <span class="mono">.venv/bin/python -m pytest</span> (relative to the project folder)</small></div>
     <div class="field"><label for="mEnv">Environment on this machine</label><textarea id="mEnv" class="mono" rows="2" placeholder="DISPLAY=:99"></textarea>
       <small>Headline and test env override these.</small></div>
+    <div class="row">
+      <div class="field"><label for="mEnvFile">Env file on this server</label><input id="mEnvFile" class="mono" placeholder="(none) e.g. lab.env" autocomplete="off">
+        <small id="mEnvFileInfo">Lines like <span class="mono">export NAME=value</span>, sent with every run on this machine. Relative to the config file's folder.</small></div>
+      <div class="field"><label for="mRemoteEnv">Env file on the machine</label><input id="mRemoteEnv" class="mono" placeholder=".env" autocomplete="off">
+        <small>Loaded there before each run, if it exists. Relative to the project folder; <span class="mono">none</span> turns it off.</small></div>
+    </div>
     <div class="field"><label for="mSshOpts">Extra ssh options</label><input id="mSshOpts" class="mono" placeholder="-o ProxyJump=bastion" autocomplete="off"></div>
     <div class="field"><label for="mNotes">Notes</label><input id="mNotes" placeholder="GPU box, Ubuntu 24.04" autocomplete="off"></div>
     <div class="field"><label>Connection</label><div class="mstat" id="mdStatus"><span class="sdot"></span><span>Not checked yet.</span></div></div>
@@ -477,7 +535,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <button class="btn" id="mdDup" title="Add a new machine with these settings (everything except the name and the host)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>Duplicate</button>
     <button class="btn" id="mdShell" title="Open a terminal on this machine over ssh, e.g. to create folders or a venv"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M4.5 6l2 2-2 2M8 10.5h3.5"/></svg>Open shell</button>
     <button class="btn" id="mdCheck">Test connection</button>
-    <button class="btn primary" id="mdSave">Save</button>
+    <button class="btn primary" id="mdSave">Save and close</button>
   </div>
 </dialog>
 
@@ -517,7 +575,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <span class="sh-dest" id="shDest"></span><span class="sh-state" id="shState"></span><span class="spacer"></span>
     <button class="icon" id="shX" title="Close the shell"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div id="shTerm"></div>
-  <div class="dlg-foot"><span style="margin-right:auto;color:var(--faint);font-size:12px">Runs as the board's ssh user. Select text to copy · Ctrl+V pastes · Shift+PgUp/PgDn scrolls · type <span class="mono">exit</span> to log out.</span>
+  <div class="dlg-foot"><span id="shHint" style="margin-right:auto;color:var(--faint);font-size:12px">Runs as the board's ssh user. Select text to copy · Ctrl+V or Shift+Insert pastes · Shift+PgUp/PgDn scrolls · type <span class="mono">exit</span> to log out.</span>
     <button class="btn" id="shReconnect" hidden>Reconnect</button><button class="btn primary" id="shClose" style="background:var(--mach);border-color:var(--mach)">Close</button></div>
 </dialog>
 
@@ -525,7 +583,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
 <dialog id="discDlg">
   <div class="dlg-head"><h2>Discover tests</h2><button class="icon" onclick="discDlg.close()"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div class="dlg-body">
-    <div class="row" style="margin-bottom:10px;align-items:center"><label style="flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)">Add under</label><select class="gsel" id="discGroup" style="flex:0 0 220px;max-width:none"></select><input class="search" id="discFilter" placeholder="Filter…" style="width:auto"></div>
+    <div class="row" style="margin-bottom:10px;align-items:center;flex-wrap:wrap"><label for="discMachine" style="flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)">On</label><select class="gsel" id="discMachine" style="flex:0 0 170px;max-width:none" title="Where pytest --collect-only runs: in that machine's project folder"></select><label for="discGroup" style="flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)">Add under</label><select class="gsel" id="discGroup" style="flex:0 0 200px;max-width:none"></select><input class="search" id="discFilter" placeholder="Filter…" style="width:auto;flex:1 1 120px"></div>
     <div id="discWhere" style="font-size:12px;color:var(--faint);margin:-4px 0 8px" class="mono"></div>
     <div id="discBody" class="tree"><div class="nolog" style="padding:30px;text-align:center">Collecting…</div></div>
     <small style="color:var(--faint);display:block;margin-top:8px">Tick a file to add the whole file as one library test, or tick single tests to add each one. Anything already in the library is skipped.</small>
@@ -554,6 +612,9 @@ const I={
   copy:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>',
   server:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.75h.01M4.5 11.25h.01" stroke-width="2.2" stroke-linecap="round"/></svg>',
   opts:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h7M13 4h1M2 8h2M8 8h6M2 12h9M14 12h0"/><circle cx="11" cy="4" r="1.6"/><circle cx="6" cy="8" r="1.6"/><circle cx="12.5" cy="12" r="1.6"/></svg>',
+  branch:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4.5" cy="3.5" r="1.6"/><circle cx="4.5" cy="12.5" r="1.6"/><circle cx="11.5" cy="5.5" r="1.6"/><path d="M4.5 5.1v5.8M11.5 7.1c0 2.4-2.5 2.9-6.2 4"/></svg>',
+  search:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>',
+  nolink:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 6.5a9.5 9.5 0 0 1 13 0M4 9.2a6 6 0 0 1 8 0M6.4 11.8a2.5 2.5 0 0 1 3.2 0M2.5 2.5l11 11"/></svg>',
   hourglass:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2h8M4 14h8M5 2c0 4 6 4 6 6s-6 2-6 6M11 2c0 4-6 4-6 6"/></svg>',
 };
 
@@ -568,24 +629,70 @@ async function api(method,path,body){
 function toast(msg,err){const d=document.createElement('div');d.textContent=msg;if(err)d.className='err';$('#toast').append(d);setTimeout(()=>d.remove(),err?6000:3000)}
 const fail=e=>{toast(e.message||String(e),true);refresh(true)};
 const now=()=>Date.now()+skew;
-// don't re-render under the user's hands (a library machine dropdown is open)
-const editingLane=()=>!!document.activeElement?.matches?.('.lib-mach');
-// swimlanes are the machines: this server first, then every machine, then any machine a card names that no longer exists
+// swimlanes are the machines: every machine, then any machine a card names that no longer exists, then "No machine"
+// for cards that have none (the board server doesn't run tests itself)
 let collapsedLanes=new Set();
 try{collapsedLanes=new Set(JSON.parse(localStorage.getItem('pb.collapsedLanes')||'[]'))}catch(e){}
+// a row shows LANE_LIMIT cards per column until it is expanded, so every machine fits on the screen
+const LANE_LIMIT=3;
+let expandedLanes=new Set();
+try{expandedLanes=new Set(JSON.parse(localStorage.getItem('pb.expandedLanes')||'[]'))}catch(e){}
+function toggleExpanded(name){
+  expandedLanes.has(name)?expandedLanes.delete(name):expandedLanes.add(name);
+  try{localStorage.setItem('pb.expandedLanes',JSON.stringify([...expandedLanes]))}catch(e){}
+  render();
+}
+// Passed / Failed stack the cards of one test (same name and test path, under the same headline): the newest card
+// shows with a "N×" badge that opens the stack. Open stacks stay open while the page is open.
+const STACKED=new Set(['passed','failed']);
+const stackKey=c=>[c.grp||'',c.title,c.target||''].join('\u0001');
+let openStacks=new Set();
+function stackEl(g,lane,status){
+  const key=[lane,status,stackKey(g[0])].join('\u0002'), open=openStacks.has(key);
+  const el=document.createElement('div'); el.className='stack'+(open?' open':'')+(g.length>2?' deep':'');
+  const top=cardEl(g[0]), n=document.createElement('button');
+  n.type='button'; n.className='stack-n';
+  n.title=open?'Hide the older cards of this test':`${g.length} cards of this test are ${status}: show the ${g.length-1} older one${g.length===2?'':'s'}`;
+  n.innerHTML=`${g.length}×${I.caret}`;
+  n.addEventListener('click',e=>{e.stopPropagation();open?openStacks.delete(key):openStacks.add(key);render()});
+  n.addEventListener('mousedown',e=>e.stopPropagation());
+  let meta=top.querySelector('.meta');  // at the end of the result line, so the name keeps its width
+  if(!meta){meta=document.createElement('div');meta.className='meta';top.querySelector('.target').after(meta)}
+  meta.append(n);
+  el.append(top);
+  if(open) g.slice(1).forEach(c=>el.append(cardEl(c)));
+  return el;
+}
 function boardLanes(){
   const ms=S.machines||[], lanes=ms.map(m=>({name:m.name,m})), known=new Set(ms.map(m=>m.name));
-  for(const c of S.cards){const n=resolveMachine(c).name; if(!known.has(n)){known.add(n);lanes.push({name:n,m:null})}}
+  let none=false;
+  for(const c of S.cards){const n=resolveMachine(c).name; if(!n){none=true;continue} if(!known.has(n)){known.add(n);lanes.push({name:n,m:null})}}
+  if(none) lanes.push({name:'',m:null,none:true});
   return lanes;
 }
 
+// Keeping up with updates: when static/index.html changes on disk this page reloads itself (once no dialog is open,
+// so nothing typed is lost); when the running server is older than this page, a note asks for a restart.
+const PAGE_VERSION='2026.10.26.4';  // = BOARD_VERSION in server.py
+let pageStamp=null;
+const verCmp=(a,b)=>{const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);
+  for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+function checkUpdates(d){
+  if(d.page){
+    if(pageStamp==null) pageStamp=d.page;
+    else if(d.page!==pageStamp&&!dragging&&![...document.querySelectorAll('dialog')].some(x=>x.open)){location.reload();return}
+  }
+  const bv=d.board_version??d.server?.board_version;
+  if(d.server||bv) $('#staleServer').hidden=!!bv&&verCmp(bv,PAGE_VERSION)>=0;
+}
 async function refresh(force){
   try{
     const d=await api('GET','/board'+(force||S.version==null?'':'?since='+S.version));
     document.body.classList.remove('is-offline');
+    checkUpdates(d);
     if(d.unchanged) return;
     S=d; skew=d.server.now*1000-Date.now();
-    if(dragging||editingLane()) pendingRender=true; else render();
+    if(dragging) pendingRender=true; else render();
     if(cardDlg.open) syncCardDialog();
   }catch(e){document.body.classList.add('is-offline')}
 }
@@ -601,7 +708,8 @@ function fmtTime(ts){
 function ago(ts){const s=Math.max(0,(now()/1000-ts)|0);if(s<60)return s+'s ago';if(s<3600)return (s/60|0)+'m ago';if(s<86400)return (s/3600|0)+'h ago';return (s/86400|0)+'d ago'}
 function dur(sec){sec=Math.max(0,sec|0);const m=sec/60|0,s=sec%60;return m>=60?`${m/60|0}h${String(m%60).padStart(2,'0')}m`:`${m}:${String(s).padStart(2,'0')}`}
 const OUTCOME_LABEL={timeout:'timed out','no-tests':'no tests collected',interrupted:'interrupted',unreachable:'machine unreachable',
-  'no-workdir':'remote folder missing','sync-failed':'sync failed','no-machine':'machine not defined','not-found':'pytest not found',error:'error','usage-error':'pytest usage error'};
+  lost:'run lost','start-failed':'could not start','checkout-failed':'git checkout failed',
+  'no-workdir':'remote folder missing','sync-failed':'sync failed','no-machine':'no machine to run on','not-bound':'not one of its headline\'s machines','not-found':'pytest not found',error:'error','usage-error':'pytest usage error'};
 function resultPill(o){
   if(!o.last_outcome||o.last_outcome==='running') return '';
   const d=o.last_finished&&o.last_started?' · '+dur(o.last_finished-o.last_started):'';
@@ -622,8 +730,7 @@ function render(){
   const b=$('#board'); b.innerHTML='';
   const srv=S.server;
   $('#info').innerHTML=`<span class="chip" title="${esc(srv.root)}">root <b>${esc(srv.root)}</b></span>
-    <span class="chip" style="flex:none">workers <b>${srv.running}/${srv.workers}</b> busy</span>
-    <span class="chip" title="${esc(srv.pytest)}">runner <b>${esc(srv.pytest)}</b></span>`;
+`;
   for(const c of COLS){
     const n=S.cards.filter(x=>x.status===c.key&&matches(x)).length;
     const h=document.createElement('div'); h.className='col-head '+c.key;
@@ -638,35 +745,58 @@ function render(){
   const gf=$('#grpFilter'); groupOptions(gf,grpSel,{all:true}); if(gf.value!==grpSel){grpSel='*';gf.value='*'}
   renderLibrary();
   renderMachines();
-  for(const lane of boardLanes()){
-    const m=lane.m, name=lane.name, isLocal=name==='local', collapsed=collapsedLanes.has(name);
+  const lanes=boardLanes();
+  if(!lanes.length) b.insertAdjacentHTML('beforeend',`<div class="board-empty">No machines yet. Tests run on machines over ssh:
+    add one with <b>+ Add</b> in the Machines column (or a <span class="mono">[machine:NAME]</span> section in the config file),
+    then drag tests from the library into its row.</div>`);
+  for(const lane of lanes){
+    const m=lane.m, name=lane.name, none=!!lane.none, collapsed=collapsedLanes.has(name);
     const cards=S.cards.filter(c=>resolveMachine(c).name===name&&matches(c));
     const cnt=k=>cards.filter(c=>c.status===k).length;
-    const st=isLocal?{state:'online'}:(m?.status||{state:m?'unknown':'offline'});
+    // each column's entries: Queued in queue order; Passed / Failed latest result first, one stack per test; the rest as arranged
+    const colItems={};
+    for(const col of COLS){
+      const list=cards.filter(c=>c.status===col.key).sort((a,b)=>col.key==='queued'?(a.queued_at-b.queued_at)
+        :STACKED.has(col.key)?((b.last_finished||0)-(a.last_finished||0)||b.id-a.id):(a.position-b.position||a.id-b.id));
+      if(!STACKED.has(col.key)){colItems[col.key]=list.map(c=>[c]);continue}
+      const by=new Map(); for(const c of list){const k=stackKey(c); by.has(k)?by.get(k).push(c):by.set(k,[c])}
+      colItems[col.key]=[...by.values()];
+    }
+    const expanded=expandedLanes.has(name), tall=COLS.some(c=>colItems[c.key].length>LANE_LIMIT+1);  // same rule as the cells: something is (or would be) hidden
+    const st=m?.status||{state:m?'unknown':'offline'};
     const h=document.createElement('div');
     h.className='lane-head st-'+st.state+(collapsed?' collapsed':'')+(m?'':' missing'); h.dataset.lane=name;
-    const host=!m?'':isLocal?m.host:(m.user?m.user+'@':'')+m.host+(m.port?':'+m.port:'')+(m.workdir?' · '+m.workdir:'');
-    const state=!m?'not defined any more; drag its cards to another machine':isLocal?'':
+    const host=!m?'':(m.user?m.user+'@':'')+m.host+(m.port?':'+m.port:'')+(m.workdir?' · '+m.workdir:'');
+    const state=none?"these cards don't run anywhere: drag them to a machine's row, or set machine = for their headline"
+      :!m?'not defined any more; drag its cards to another machine':
       st.state==='checking'?'checking…':st.state==='unknown'?'not checked yet':(st.state==='online'?'':st.detail||'');
-    const slots=m?Array.from({length:Math.min(m.slots,12)},(_,i)=>`<i class="${i<m.busy?'on':''}"></i>`).join(''):'';
     h.innerHTML=`<button class="icon" data-act="toggle" title="Collapse">${I.caret}</button>
       <span class="sdot"></span>
-      ${isLocal||!m?`<span class="lane-name">${I.server}${esc(isLocal?'This server':name)}</span>`
+      ${!m?`<span class="lane-name">${I.server}${esc(none?'No machine':name)}</span>`
         :`<button class="lane-name" data-act="edit" title="Edit machine ${esc(name)}">${I.server}${esc(name)}</button>`}
       ${host?`<span class="lane-host mono" title="${esc(host)}">${esc(host)}</span>`:''}
-      ${m?`<span class="slots" style="margin-left:0" title="${m.busy} of ${m.slots} ${isLocal?'worker':'slot'}(s) busy">${slots}</span>`:''}
       ${state?`<span class="lane-state" title="${esc(state)}">${esc(state)}</span>`:''}
       <span class="lane-sum">${cards.length} card${cards.length===1?'':'s'}
         ${cnt('running')?`<span style="color:var(--running)">${I.spin.replace('<svg','<svg width=12 height=12')}${cnt('running')} running</span>`:''}
         ${cnt('passed')?`<span style="color:var(--passed)">● ${cnt('passed')}</span>`:''}
         ${cnt('failed')?`<span style="color:var(--failed)">● ${cnt('failed')}</span>`:''}</span>
-      <span class="lane-actions">${m?`<button class="btn" style="padding:3px 8px;font-size:12px" data-act="run" title="Queue every card on ${esc(machLabel(name))}${grpSel!=='*'?' (headline '+esc(grpSel||'none')+' only)':''}">${I.play}Run lane</button>`:''}</span>`;
+      <span class="lane-actions">${tall?`<button class="btn" style="padding:3px 8px;font-size:12px" data-act="expand" title="${expanded?`Show at most ${LANE_LIMIT} cards per column`:'Show every card of this machine'}">${expanded?'Show less':`Show all (${cards.length})`}</button>`:''}<button class="btn" style="padding:3px 8px;font-size:12px" data-act="clear" ${cnt('passed')+cnt('failed')?'':'disabled'} title="${cnt('passed')+cnt('failed')?`Remove the ${cnt('passed')+cnt('failed')} finished (passed and failed) card${cnt('passed')+cnt('failed')===1?'':'s'} from ${esc(machLabel(name))}${grpSel!=='*'?' (headline '+esc(grpSel||'none')+' only)':''}; their run history is kept`:`Nothing to clear: no passed or failed cards on ${esc(machLabel(name))}`}">Clear</button>${m?`<button class="btn" style="padding:3px 8px;font-size:12px" data-act="run" title="Queue every card on ${esc(machLabel(name))}${grpSel!=='*'?' (headline '+esc(grpSel||'none')+' only)':''}">${I.play}Run lane</button>`:''}</span>`;
     h.onclick=e=>{
       const a=e.target.closest('[data-act]')?.dataset.act; if(!a) return;
       if(a==='toggle'){collapsed?collapsedLanes.delete(name):collapsedLanes.add(name);try{localStorage.setItem('pb.collapsedLanes',JSON.stringify([...collapsedLanes]))}catch(e){};render()}
       if(a==='edit') openMachine(name);
+      if(a==='expand') return toggleExpanded(name);
+      if(a==='clear'){
+        // an older server ignores "machine" and would clear every row: wait for the restart
+        if(!$('#staleServer').hidden){toast('Restart the board server first: the running one is older than this page and would clear every row.',true);return}
+        const n=cnt('passed')+cnt('failed');
+        if(!confirm(`Remove ${n} finished card${n===1?'':'s'} from ${machLabel(name)}${grpSel!=='*'?' (headline '+(grpSel||'none')+')':''}?\nRun history stays with the library test.`)) return;
+        api('POST','/cards/clear',{statuses:['passed','failed'],machine:name,...(grpSel!=='*'?{grp:grpSel||null}:{})})
+          .then(d=>{toast(`Cleared ${d.cleared} card${d.cleared===1?'':'s'} from ${machLabel(name)}`);refresh(true)}).catch(fail);
+        return;
+      }
       if(a==='run') api('POST',`/machines/${encodeURIComponent(name)}/run`,grpSel!=='*'?{grp:grpSel||null}:{})
-        .then(d=>{toast(`Queued ${d.queued} card${d.queued===1?'':'s'} on ${machLabel(name)}`);refresh(true)}).catch(fail);
+        .then(d=>{toast(`Queued ${d.queued} card${d.queued===1?'':'s'} on ${machLabel(name)}${d.skipped?` · ${d.skipped} skipped: their headline doesn't run on ${machLabel(name)}`:''}`);refresh(true)}).catch(fail);
     };
     b.append(h);
     if(collapsed) continue;
@@ -675,16 +805,17 @@ function render(){
     for(const col of COLS){
       const cell=document.createElement('div'); cell.className='cell '+col.key;
       cell.dataset.lane=name; cell.dataset.status=col.key;
-      const list=cards.filter(c=>c.status===col.key).sort((a,b)=>col.key==='queued'?(a.queued_at-b.queued_at):(a.position-b.position||a.id-b.id));
-      if(!list.length) cell.innerHTML=`<div class="empty">${{backlog:'Drag tests here from the library',scheduled:'Drop to schedule',queued:'Drop to run now'}[col.key]||''}</div>`;
-      else if(!list.some(c=>c.optset)) list.forEach(c=>cell.append(cardEl(c,rank.get(c.id))));
-      else{
-        // option-set groups: Queued in queue order, the other columns in the order of the config file's options
-        let keys=[...new Set(list.map(c=>c.optset||null))];
-        if(col.key!=='queued') keys.sort(osCompare);
-        const mini=keys.length>1, wrap=mini?document.createElement('div'):cell;  // 2+ option sets: side by side
-        if(mini){wrap.className='tgroups';cell.append(wrap)}
-        for(const o of keys) wrap.append(optGroup(name,m,col.key,o,list.filter(c=>(c.optset||null)===o),rank,mini));
+      const items=colItems[col.key], size=gs=>gs.reduce((n,g)=>n+g.length,0);
+      if(!items.length) cell.innerHTML=`<div class="empty">${none?'':{backlog:'Drag tests here from the library',scheduled:'Drop to schedule',queued:'Drop to run now'}[col.key]||''}</div>`;
+      else{  // one list; a card's options show as its dots
+        const shown=expanded||items.length<=LANE_LIMIT+1?items:items.slice(0,LANE_LIMIT);  // never hide just one entry
+        shown.forEach(g=>cell.append(g.length>1?stackEl(g,name,col.key):cardEl(g[0],rank.get(g[0].id))));
+        const hidden=size(items)-size(shown);
+        if(hidden)
+          cell.insertAdjacentHTML('beforeend',`<button class="more" data-act="expand" title="Show every card of ${esc(machLabel(name))}">+${hidden} more</button>`);
+        else if(expanded&&items.length>LANE_LIMIT+1)
+          cell.insertAdjacentHTML('beforeend',`<button class="more" data-act="expand">Show less</button>`);
+        cell.querySelector('.more')?.addEventListener('click',e=>{e.stopPropagation();toggleExpanded(name)});
       }
       wireCell(cell);
       b.append(cell);
@@ -695,133 +826,121 @@ function render(){
 
 /* ---------------- option sets (extra pytest args per card; offered from each headline's "options =" list) */
 const allOptions=()=>(S.groups||[]).flatMap(g=>g.options||[]);
+// "-m smoke -x --foo" -> the known options in it (config order) and what's left: {known:[{label,args}], rest:'--foo'}
+function splitOptset(o,opts){
+  let rest=' '+String(o||'').trim().replace(/\s+/g,' ')+' '; const known=[];
+  for(const x of [...opts].sort((a,b)=>b.args.length-a.args.length)){
+    const i=rest.indexOf(' '+x.args+' ');
+    if(i>=0&&!known.some(k=>k.args===x.args)){known.push(x);rest=rest.slice(0,i)+rest.slice(i+x.args.length+1)}
+  }
+  known.sort((a,b)=>opts.indexOf(a)-opts.indexOf(b));
+  return {known,rest:rest.trim()};
+}
 function osLabel(o,grp){
   if(!o) return 'no extra options';
-  const hit=(grpInfo(grp)?.options||[]).find(x=>x.args===o)||allOptions().find(x=>x.args===o);
-  return hit?hit.label:o;
+  const own=grpInfo(grp)?.options||[], hit=own.find(x=>x.args===o)||allOptions().find(x=>x.args===o);
+  if(hit) return hit.label;
+  const d=splitOptset(o,own.length?own:allOptions());  // a card with several options: "Smoke + Stop at first failure"
+  return d.known.length?[...d.known.map(x=>x.label),...(d.rest?[d.rest]:[])].join(' + '):o;
+}
+// each option of the config file gets its own colour (by its place in the options lists), the same on the cards'
+// dots and in the dialog; anything else gets a colour from its text
+const OPT_HUES=[355,212,135,38,282,186,18,95,325,245,60,160];
+function optHue(args){
+  const i=[...new Set(allOptions().map(o=>o.args))].indexOf(args);
+  return i>=0?OPT_HUES[i%OPT_HUES.length]:osHue(args);
+}
+function optDots(c){
+  if(!c.optset) return '';
+  const own=grpInfo(c.grp)?.options||[], d=splitOptset(c.optset,own.length?own:allOptions());
+  const tip='Options: '+[...d.known.map(x=>x.label===x.args?x.args:`${x.label} (${x.args})`),...(d.rest?[d.rest]:[])].join(', ');
+  return `<span class="odots" title="${esc(tip)}">${d.known.map(x=>`<span class="odot" style="--th:${optHue(x.args)}"></span>`).join('')}${d.rest?'<span class="odot other"></span>':''}</span>`;
 }
 function osHue(o){let h=2166136261;for(const ch of String(o||'')){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return ((h>>>0)%360)}
-function osCompare(x,y){  // no options first, then the config file's order, then the rest alphabetically
-  if(x==null) return -1; if(y==null) return 1;
-  const order=allOptions().map(o=>o.args), ix=order.indexOf(x), iy=order.indexOf(y);
-  if(ix>=0&&iy>=0) return ix-iy; if(ix>=0) return -1; if(iy>=0) return 1; return x.localeCompare(y);
-}
-function optGroup(lane,m,col,o,cards,rank,mini){
-  const g=document.createElement('div'); g.className='tgroup'+(o?'':' none'); g.dataset.optset=o??'';
-  const label=osLabel(o,cards[0]?.grp), hue=o?osHue(o):0;
-  if(o) g.style.setProperty('--th',hue);
-  const canQueue=m&&['backlog','scheduled','passed','failed'].includes(col);
-  g.title=o?(label!==o?`${label}: ${o}`:o):'cards without extra options';
-  g.innerHTML=`<div class="tg-head"><span class="tbadge" style="--th:${hue}">${mini?esc(o?label:'none'):I.opts+esc(label)}</span>
-      ${!mini&&label!==o&&o?`<code class="mono" style="font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o)}</code>`:''}
-      ${!mini&&cards.length>1?`<span>${cards.length}</span>`:''}
-      ${canQueue?`<button class="icon trun" title="Queue ${cards.length===1?'this card':'these '+cards.length+' cards'} (${esc(label)})">${I.play}</button>`:''}</div>
-    <div class="tg-cards"></div>`;
-  const box=g.querySelector('.tg-cards'); cards.forEach(c=>box.append(cardEl(c,rank.get(c.id),mini)));
-  g.querySelector('.trun')?.addEventListener('click',e=>{
-    e.stopPropagation();
-    api('POST',`/machines/${encodeURIComponent(lane)}/run`,{optset:o,statuses:[col],...(grpSel!=='*'?{grp:grpSel||null}:{})})
-      .then(d=>{toast(`Queued ${d.queued} card${d.queued===1?'':'s'} (${label}) on ${machLabel(lane)}`);refresh(true)}).catch(fail);
-  });
-  return g;
-}
 function quoteProblem(line){  // same idea as the server's check: quotes must be closed
   let q=null;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='\\'&&q!=="'"){i++;continue}if(q){if(ch===q)q=null}else if(ch==='"'||ch==="'")q=ch}
   return q?`unclosed ${q} in “${line}”`:null;
 }
-// Which option sets to put a library test on the board with. Resolves to a list (null = a card without
-// extra options), [] for a single plain card, or null when cancelled. always=false skips the dialog when the
-// test's headline offers no options and nothing was picked for it before.
+// Which options to put a library test on the board with: ONE card, whose option set is every ticked option.
+// Resolves to the list of ticked options ([] for none; its .extra holds the extra arguments), or null when
+// cancelled. always=false skips the dialog when the test's headline offers no options and nothing was picked or
+// typed for it before. prefill: the option set of the group the test was dropped on (its options get ticked).
 const optDlg=$('#optDlg');
+const oneSet=sets=>{const j=sets.filter(Boolean).join(' ');return j?[j]:[]};  // the ticked options as one card's option set
 function askOptsets(test,lane,status,prefill,always){
   const offered=grpInfo(test.grp)?.options||[];
   let remembered=null; try{remembered=JSON.parse(test.optsets||'null')}catch(e){}
-  if(!always&&prefill===undefined&&!offered.length&&!(remembered||[]).some(Boolean)) return Promise.resolve([]);
+  if(!always&&prefill===undefined&&!offered.length&&!(remembered||[]).some(Boolean)&&!test.extra_args) return Promise.resolve([]);
   return new Promise(res=>{
     const col=COLS.find(c=>c.key===status)?.label||status;
-    const want=prefill!==undefined?[prefill===''?null:prefill]:(remembered||[]);
+    let want=[], args=test.extra_args||'';
+    if(prefill!==undefined){  // dropped on a group: tick its options; anything else in it goes to the extra arguments
+      const d=splitOptset(prefill,offered); want=d.known.map(x=>x.args); if(d.rest) args=d.rest;
+    }else for(const o of remembered||[]){  // picked last time (one option per entry, or older combined ones)
+      const d=splitOptset(o,offered); want.push(...d.known.map(x=>x.args));
+    }
     $('#odIcon').innerHTML=I.opts.replace('<svg','<svg width=18 height=18');
     $('#odHead').textContent=`Run “${test.name||test.title}” with…`;
-    $('#odIntro').innerHTML=`Adds <b>one card per ticked line</b> to <b>${esc(machLabel(lane))}</b> · ${esc(col)}. Each card adds its options to the pytest command line.`;
-    const rows=[{label:'No extra options',args:null},...offered];
-    $('#odList').innerHTML=rows.map((o,i)=>`<label class="optrow${o.args?'':' none'}" style="--th:${o.args?osHue(o.args):0}">
+    $('#odIntro').innerHTML=`Adds <b>one card</b> to <b>${esc(machLabel(lane))}</b> · ${esc(col)}. Its pytest command gets every ticked option and the extra arguments.`;
+    $('#odList').innerHTML=offered.map((o,i)=>`<label class="optrow" style="--th:${optHue(o.args)}">
         <input type="checkbox" data-i="${i}" ${want.includes(o.args)?'checked':''}><span class="sw"></span>
-        <span class="ol">${esc(o.label)}</span>${o.args&&o.label!==o.args?`<code title="${esc(o.args)}">${esc(o.args)}</code>`:'<span></span>'}</label>`).join('');
-    $('#odExtra').value=want.filter(o=>o&&!offered.some(x=>x.args===o)).join('\n');
-    $('#odHint').innerHTML=offered.length?`The list comes from <code class="mono">options =</code> under <b>${esc(test.grp)}</b> in pytest-board.ini.`
-      :test.grp?`Add an <code class="mono">options =</code> list under <b>${esc(test.grp)}</b> in pytest-board.ini to offer ready-made option sets here.`
-      :'Put the test under a headline with an <code class="mono">options =</code> list in pytest-board.ini to offer ready-made option sets here.';
+        <span class="ol">${esc(o.label)}</span>${o.label!==o.args?`<code title="${esc(o.args)}">${esc(o.args)}</code>`:'<span></span>'}</label>`).join('');
+    $('#odList').hidden=!offered.length;
+    $('#odArgs').value=args;
+    $('#odHint').innerHTML=offered.length?`The options come from <code class="mono">options =</code> under <b>${esc(test.grp)}</b> in pytest-board.ini.`
+      :test.grp?`Add an <code class="mono">options =</code> list under <b>${esc(test.grp)}</b> in pytest-board.ini to offer ready-made options here.`
+      :'Put the test under a headline with an <code class="mono">options =</code> list in pytest-board.ini to offer ready-made options here.';
     const pick=()=>{
-      const out=[];
-      $('#odList').querySelectorAll('input:checked').forEach(x=>{const a=rows[+x.dataset.i].args;if(!out.includes(a))out.push(a)});
-      const extra=$('#odExtra').value.split('\n').map(l=>l.trim().replace(/\s+/g,' ')).filter(Boolean);
-      for(const l of extra){const bad=quoteProblem(l);if(bad)return {error:bad};if(!out.includes(l))out.push(l)}
-      return {sets:out};
+      const sets=[...$('#odList').querySelectorAll('input:checked')].map(x=>offered[+x.dataset.i].args);
+      const a=$('#odArgs').value.trim(), bad=a&&quoteProblem(a);
+      return bad?{error:'Extra arguments: '+bad}:{sets,args:a};
     };
     const upd=()=>{
       const r=pick(), p=$('#odPreview'), ok=$('#odOk');
       p.classList.toggle('err',!!r.error); ok.disabled=!!r.error;
       if(r.error){p.textContent=r.error;return}
-      const n=Math.max(1,r.sets.length);
-      p.innerHTML=r.sets.length?`${n} card${n===1?'':'s'}: `+r.sets.map(o=>o?`<b>${esc(o)}</b>`:'<i>no extra options</i>').join(' · '):'1 card without extra options.';
-      ok.textContent=`Add ${n} card${n===1?'':'s'}`;
+      const cmd=[...r.sets,r.args].filter(Boolean).join(' ');
+      p.innerHTML=cmd?`1 card, run with <b class="mono">${esc(cmd)}</b>`:'1 card without extra options.';
+      ok.textContent='Add card';
     };
-    $('#odList').onchange=upd; $('#odExtra').oninput=upd;
-    optDlg.onkeydown=e=>{  // Enter adds (the form's first button would be Cancel); in the text box Ctrl+Enter
-      if(e.key!=='Enter'||(e.target.id==='odExtra'&&!(e.ctrlKey||e.metaKey))) return;
+    $('#odList').onchange=upd; $('#odArgs').oninput=upd;
+    optDlg.onkeydown=e=>{  // Enter adds (the form's first button would be Cancel)
+      if(e.key!=='Enter') return;
       e.preventDefault(); if(!$('#odOk').disabled) optDlg.close('ok');
     };
     upd(); optDlg.returnValue=''; optDlg.showModal(); $('#odOk').focus();
     optDlg.onclose=()=>{
       if(optDlg.returnValue!=='ok') return res(null);
-      const r=pick(); res(r.error?null:r.sets);
+      const r=pick(); if(r.error) return res(null);
+      r.sets.extra=r.args; res(r.sets);
     };
   });
 }
 
-// compact card for side-by-side option-set groups: title + one status line, details in the tooltip
-function miniCardHtml(c,idx){
-  let st='';
-  if(c.status==='queued') st=`${I.hourglass}${idx===0?'next':'#'+(idx+1)}`;
-  else if(c.status==='running') st=`${I.spin}<span class="elapsed" data-since="${c.last_started||c.updated}"></span>`;
-  else if(c.status==='scheduled') st=c.cron?`${I.repeat}cron`:c.run_at?`${I.clock}${new Date(c.run_at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`:'';
-  if(c.status!=='running'&&c.status!=='queued'&&c.last_outcome&&c.last_outcome!=='running'){
-    const bad=(c.last_failed||0)+(c.last_errors||0);
-    st+=c.last_outcome==='passed'?`<span class="ok">✓${c.last_passed??''}</span>`
-      :c.last_outcome==='cancelled'?'<span>cancelled</span>':`<span class="bad">✗${bad||''}</span>`;
-  }
-  const res=c.last_outcome&&c.last_outcome!=='running'?(c.last_outcome==='passed'?`passed (${c.last_passed??0})`:OUTCOME_LABEL[c.last_outcome]||c.last_outcome):'';
-  const tip=[c.title,(c.target||'(whole suite)')+(c.args?' '+c.args:''),c.grp&&'headline '+c.grp,c.optset&&'options: '+c.optset,
-    COLS.find(x=>x.key===c.status)?.label+(c.cron?' · cron '+c.cron:''),res&&'last run: '+res].filter(Boolean).join('\n');
-  return {html:`<div class="mini-title">${esc(c.title)}</div>${st?`<div class="mini-meta">${st}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`,tip};
-}
-function cardEl(c,idx,mini){
+function cardEl(c,idx){
   const el=document.createElement('div');
-  el.className='card '+c.status+(mini?' mini':''); el.dataset.id=c.id;
+  el.className='card '+c.status; el.dataset.id=c.id;
   el.draggable=c.status!=='running';
-  if(mini){
-    const m=miniCardHtml(c,idx); el.innerHTML=m.html; el.title=m.tip;
-    if(c.grp) el.style.borderLeftColor=grpColor(c.grp);  // the headline's colour, like the tag on big cards
-    el.onclick=()=>openCard(c.id);
-    el.addEventListener('dragstart',e=>startDrag(e,el,c,'move','ghost'));
-    el.addEventListener('dragend',()=>endDrag(el,'ghost'));
-    return el;
-  }
   let meta='';
   if(c.status==='running') meta+=`<span class="pill run">${I.spin}running <span class="elapsed" data-since="${c.last_started||c.updated}"></span></span>`;
-  if(c.status==='queued') meta+=`<span class="pill q">${I.hourglass}${idx===0?'next up':'#'+(idx+1)+' in queue'}</span>`;
+  if(c.status==='running'&&c.link) meta+=`<span class="pill warn" title="${esc(linkTip(c,resolveMachine(c).name))}">${I.nolink}reconnecting</span>`;
+  const wait=waitingFor(c);
+  if(wait) meta+=`<span class="pill warn" title="${esc(waitTip(wait))}">${I.nolink}waiting for ${esc(wait.name)}</span>`;
+  else if(c.status==='queued') meta+=`<span class="pill q">${I.hourglass}${idx===0?'next up':'#'+(idx+1)+' in queue'}</span>`;
   if(c.cron) meta+=`<span class="pill sch" title="cron: ${esc(c.cron)}">${I.repeat}<span class="mono">${esc(c.cron)}</span></span>`;
   if(c.run_at&&c.status==='scheduled') meta+=`<span class="pill sch" title="${new Date(c.run_at*1000).toLocaleString()}">${I.clock}${fmtTime(c.run_at)}</span>`;
+  if(!boundOk(c,resolveMachine(c).name)&&c.last_outcome!=='not-bound') meta+=`<span class="pill bad" title="${esc(boundTip(c))}. Drag this card to one of those rows.">${I.x}not a ${esc(c.grp)} machine</span>`;
   meta+=resultPill(c);
   if(c.last_finished&&c.status!=='running') meta+=`<span class="pill" title="${new Date(c.last_finished*1000).toLocaleString()}">${ago(c.last_finished)}</span>`;
   const q=c.status==='running'||c.status==='queued'
     ?`<button class="icon quick" data-act="stop" title="${c.status==='running'?'Stop':'Unqueue'}">${I.stop}</button>`
-    :`<button class="icon quick" data-act="run" title="Run now">${I.play}</button>`;
+    :resolveMachine(c).name?`<button class="icon quick" data-act="run" title="Run now">${I.play}</button>`:'';
   el.innerHTML=`<div class="card-top"><span class="card-title">${esc(c.title)}</span>${q}</div>
     <div class="target mono">${esc(c.target||'(whole suite)')}${c.args?' <span style="color:var(--faint)">'+esc(c.args)+'</span>':''}</div>
     ${meta?`<div class="meta">${meta}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`;
   const libCopy=c.test_id&&S.tests.some(t=>t.id===c.test_id), mp='';  // the swimlane shows the machine
-  if(c.grp||libCopy||mp) el.insertAdjacentHTML('afterbegin',`<div class="card-tags">${grpTag(c.grp)}${mp}${libCopy?`<span class="from" title="Copied from the test library">${I.copy}library copy</span>`:''}</div>`);
+  const bp=branchPill(c), dots=optDots(c);
+  if(c.grp||libCopy||mp||bp||dots) el.insertAdjacentHTML('afterbegin',`<div class="card-tags">${grpTag(c.grp)}${dots}${mp}${bp}${libCopy?`<span class="from" title="Copied from the test library">${I.copy}library copy</span>`:''}</div>`);
   el.onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
     if(a==='run'){e.stopPropagation();api('POST',`/cards/${c.id}/run`).then(()=>refresh(true)).catch(fail);return}
@@ -836,23 +955,23 @@ function startDrag(e,el,item,effect,cls){
   dragging=item; e.dataTransfer.effectAllowed=effect; e.dataTransfer.setData('text/plain',String(item.id));
   requestAnimationFrame(()=>{
     el.classList.add(cls);
-    if(item._machine){document.body.classList.add('machine-drag');return}  // targets: cards, library tests
     document.body.classList.add('is-dragging');
-    document.querySelectorAll('.cell').forEach(x=>x.classList.add(allowed(x.dataset.status)?'allowed':'blocked'));
+    document.querySelectorAll('.cell').forEach(x=>x.classList.add(allowed(x.dataset.status,x.dataset.lane)?'allowed':'blocked'));
     if(!item._test) $('#library').classList.add('accepting')});
 }
 function endDrag(el,cls){
-  el.classList.remove(cls); document.body.classList.remove('is-dragging','machine-drag');
+  el.classList.remove(cls); document.body.classList.remove('is-dragging');
   document.querySelectorAll('.cell').forEach(x=>x.classList.remove('allowed','blocked','over'));
   document.querySelectorAll('.placeholder').forEach(p=>p.remove());
-  document.querySelectorAll('.tgroup.over').forEach(x=>x.classList.remove('over'));
-  document.querySelectorAll('.mdrop').forEach(x=>x.classList.remove('mdrop'));
   $('#library').classList.remove('accepting','over');
   dragging=null; if(pendingRender){pendingRender=false;render()}
 }
 const COPY_TARGETS=new Set(['backlog','scheduled','queued']);
-function allowed(status){
-  if(!dragging||dragging._machine) return false;
+function allowed(status,lane){
+  if(!dragging) return false;
+  // "No machine": its cards can be rearranged in Backlog; anything else goes to a machine's row
+  if(lane==='') return !dragging._test&&!resolveMachine(dragging).name&&status==='backlog';
+  if(!boundOk(dragging,lane)) return false;  // its headline is bound to other machines
   if(dragging._test) return COPY_TARGETS.has(status);          // library tests are copied, never moved
   return !(SYSTEM.has(status)&&status!==dragging.status);
 }
@@ -860,67 +979,56 @@ function allowed(status){
 /* ---------------- library column */
 /* ---------------- machines (SSH hosts) */
 const machInfo=n=>(S.machines||[]).find(m=>m.name===n);
-// same rule as the server: the card/test's own machine > its headline's machine > this server
+// same rule as the server: the card/test's own machine > its headline's machine; '' = no machine
 function resolveMachine(it){
-  if(it.machine) return {name:it.machine,src:'card'};
-  const g=grpInfo(it.grp); if(g?.machine) return {name:g.machine,src:'headline'};
-  return {name:'local',src:'default'};
+  if(it.machine&&it.machine!=='local') return {name:it.machine,src:'card'};
+  const g=grpInfo(it.grp); if(g?.machine&&g.machine!=='local') return {name:g.machine,src:'headline'};
+  return {name:'',src:'none'};
 }
-const machLabel=n=>n==='local'?'this server':n;
-function machPill(it,{always=false}={}){
-  const r=resolveMachine(it);
-  if(r.name==='local'&&!always&&it.machine!=='local') return '';
-  const missing=r.name!=='local'&&!machInfo(r.name);
-  const why=r.src==='headline'?`from headline ${it.grp}`:r.src==='card'?'set on this card':'default';
-  return `<span class="mpill${r.src==='headline'?' inherit':''}${missing?' missing':''}" title="Runs on ${esc(machLabel(r.name))} (${esc(why)})${missing?' — this machine is not defined':''}">${I.server}${esc(machLabel(r.name))}</span>`;
+// machines = a, b on a headline: its tests run only on those machines (first = default); none listed = anywhere
+const boundTo=it=>grpInfo(it.grp)?.machines||[];
+const boundOk=(it,lane)=>{const b=boundTo(it);return !b.length||!lane||b.includes(lane)};
+const boundTip=it=>`${it.grp} tests run only on ${boundTo(it).join(', ')} (machines = in pytest-board.ini)`;
+const machLabel=n=>n==='local'?'this server':n||'no machine';  // 'local': runs from before the board stopped running tests itself
+// git branch a card/test runs on: its own, else its headline's (null: the project folder as it is)
+function resolveBranch(it){
+  if(it.branch) return {name:it.branch,src:'card'};
+  const g=grpInfo(it.grp); if(g?.branch) return {name:g.branch,src:'headline'};
+  return {name:null,src:'default'};
 }
+function branchPill(it){
+  const b=resolveBranch(it); if(!b.name) return '';
+  return `<span class="bpill${b.src==='headline'?' inherit':''}" title="Checks out ${esc(b.name)} (after git fetch) before pytest starts${b.src==='headline'?' · from headline '+esc(it.grp):''}">${I.branch}${esc(b.name)}</span>`;
+}
+// a queued card whose machine can't be reached waits for it (it starts once a health check gets through again)
+function waitingFor(c){
+  if(c.status!=='queued') return null;
+  const n=resolveMachine(c).name, st=n&&machInfo(n)?.status;
+  return st&&st.state==='offline'?{name:n,detail:st.detail||''}:null;
+}
+const hhmm=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const linkTip=(c,n)=>`No connection to ${n} since ${hhmm(c.link.since)}${c.link.detail?' ('+c.link.detail+')':''}. The run goes on there by itself; the board reconnects and catches up on the output.`;
+const waitTip=w=>`${w.name} can't be reached${w.detail?' ('+w.detail+')':''}. The card waits here and starts as soon as ${w.name} answers again.`;
 function renderMachines(){
   const ms=S.machines||[], list=$('#machList'); list.innerHTML='';
-  $('#machCount').textContent=Math.max(0,ms.length-1);
+  $('#machCount').textContent=ms.length;
   for(const m of ms){
     const st=m.status||{state:'unknown'}, el=document.createElement('div');
-    el.className='mach-item st-'+st.state; el.draggable=true; el.dataset.machine=m.name;
-    const slots=Array.from({length:Math.min(m.slots,12)},(_,i)=>`<i class="${i<m.busy?'on':''}"></i>`).join('');
-    const hostLine=m.name==='local'?esc(m.host):esc((m.user?m.user+'@':'')+m.host+(m.port?':'+m.port:''));
-    const statusText=m.name==='local'?`runs with ${m.slots} worker${m.slots===1?'':'s'}`:
-      st.state==='checking'?'checking…':st.state==='unknown'?'not checked yet':`${esc(st.detail||'')}${st.checked?' · '+ago(st.checked):''}`;
-    el.innerHTML=`<div class="mi-top"><span class="sdot"></span><span class="mi-name">${m.name==='local'?'This server':esc(m.name)}</span>
-        ${m.source==='config'?'<span class="mi-src" title="Defined in pytest-board.ini">config</span>':''}
-        <span class="slots" title="${m.busy} of ${m.slots} slot(s) busy">${slots}</span></div>
+    el.className='mach-item st-'+st.state; el.dataset.machine=m.name;  // not draggable: cards move by dragging them to a row
+    const run=S.cards.find(c=>c.status==='running'&&resolveMachine(c).name===m.name);  // one test at a time
+    const hostLine=esc((m.user?m.user+'@':'')+m.host+(m.port?':'+m.port:''));
+    const statusText=st.state==='checking'?'checking…':st.state==='unknown'?'not checked yet':`${esc(st.detail||'')}${st.checked?' · '+ago(st.checked):''}`;
+    el.innerHTML=`<div class="mi-top"><span class="sdot"></span><span class="mi-name">${esc(m.name)}</span>
+        ${m.source==='config'?'<span class="mi-src" title="Defined in pytest-board.ini">config</span>':''}</div>
       <div class="mi-line mono" title="${hostLine}">${hostLine}</div>
-      ${m.name!=='local'?`<div class="mi-line mono" title="${esc(m.workdir||'~')}">${esc(m.workdir||'~')}${m.sync?' <span style="color:var(--mach)">⇄ sync</span>':''}</div>`:''}
-      <div class="mi-status" title="${esc(st.detail||'')}">${statusText}</div>`;
-    el.onclick=()=>{ if(m.name!=='local') openMachine(m.name) };
-    el.addEventListener('dragstart',e=>startDrag(e,el,{_machine:true,id:m.name,name:m.name},'link','lifting'));
-    el.addEventListener('dragend',()=>endDrag(el,'lifting'));
+      <div class="mi-line mono" title="${esc(m.workdir||'~')}">${esc(m.workdir||'~')}${m.sync?' <span style="color:var(--mach)">⇄ sync</span>':''}</div>
+      <div class="mi-status" title="${esc(st.detail||'')}">${statusText}</div>
+      ${run?`<div class="mi-run" title="Running ${esc(run.title)}">${I.spin}<span>running ${esc(run.title)}</span></div>`:''}`;
+    el.onclick=()=>openMachine(m.name);
     list.append(el);
   }
-  if(ms.length<=1) list.insertAdjacentHTML('beforeend','<div class="lib-empty">No machines yet. Add one, or put <span class="mono">[machine:NAME]</span> sections in the config file.</div>');
+  if(!ms.length) list.insertAdjacentHTML('beforeend','<div class="lib-empty">No machines yet. Add one, or put <span class="mono">[machine:NAME]</span> sections in the config file.</div>');
 }
-// drop a machine on a card (moves it to that machine's lane) or a library test
-function machineTarget(e){return e.target.closest?.('.card, .lib-item')}
-document.addEventListener('dragover',e=>{
-  if(!dragging?._machine) return;
-  const t=machineTarget(e);
-  document.querySelectorAll('.mdrop').forEach(x=>x!==t&&x.classList.remove('mdrop'));
-  if(!t) return;
-  if(t.classList.contains('card')&&S.cards.find(c=>c.id==t.dataset.id)?.status==='running') return;  // stop it first
-  e.preventDefault(); e.dataTransfer.dropEffect='link'; t.classList.add('mdrop');
-});
-document.addEventListener('drop',e=>{
-  if(!dragging?._machine) return;
-  const t=machineTarget(e); if(!t) return;
-  e.preventDefault(); e.stopPropagation();
-  const name=dragging.name, label=machLabel(name);
-  if(t.classList.contains('card')){
-    const c=S.cards.find(x=>x.id==t.dataset.id);
-    api('PATCH',`/cards/${c.id}`,{machine:name}).then(()=>{toast(`“${c.title}” runs on ${label}`);refresh(true)}).catch(fail);
-  }else if(t.classList.contains('lib-item')){
-    const tt=S.tests.find(x=>x.id==t.dataset.test);
-    api('PATCH',`/tests/${tt.id}`,{machine:name}).then(()=>{toast(`Library test “${tt.name}” now runs on ${label}`);refresh(true)}).catch(fail);
-  }
-},true);
-
 /* headlines come from the server's pytest-board.ini ([TEST_SYSTEM], …) */
 const grpInfo=k=>(S.groups||[]).find(g=>g.key===k);
 const grpColor=k=>grpInfo(k)?.color||'var(--faint)';
@@ -951,9 +1059,12 @@ function renderLibrary(){
   const f=($('#libSearch').value||'').trim().toLowerCase();
   $('#libCount').textContent=(S.tests||[]).length;
   const cfg=S.groups_config||{}, lc=$('#libCfg');
-  lc.className='lib-cfg'+(cfg.error?' err':'');
-  lc.innerHTML=cfg.error?`Config problem: ${esc(cfg.error)}`:cfg.exists?`Headlines from <span class="mono">${esc(cfg.path)}</span>`
-    :cfg.path?`No <span class="mono">${esc(cfg.path.split('/').pop())}</span> found, so there are no headlines yet (see README).`:'';
+  const ef=cfg.env_file, envErr=[ef?.error,...(S.groups||[]).map(g=>g.env_file&&(g.env_file.error||(!g.env_file.exists&&`[${g.key}] env_file not found: ${g.env_file.path}`)))].filter(Boolean);
+  lc.className='lib-cfg'+(cfg.error||envErr.length?' err':'');
+  lc.innerHTML=(cfg.error?`Config problem: ${esc(cfg.error)}`:cfg.exists?`Headlines from <span class="mono">${esc(cfg.path)}</span>`
+    :cfg.path?`No <span class="mono">${esc(cfg.path.split('/').pop())}</span> found, so there are no headlines yet (see README).`:'')
+    +(ef?.exists?`<br>Every run gets ${ef.keys.length} variable${ef.keys.length===1?'':'s'} from <span class="mono" title="${esc(ef.keys.join(', '))}">${esc(ef.path)}</span>`:'')
+    +envErr.map(e=>`<br>Env file problem: ${esc(e)}`).join('');
   const list=$('#libList'); list.innerHTML='';
   let shown=0;
   for(const sec of librarySections()){
@@ -966,8 +1077,10 @@ function renderLibrary(){
     const box=document.createElement('div');
     box.className='lib-group'+(collapsedGrps.has(k)&&!f?' collapsed':''); box.dataset.grp=k;
     box.style.setProperty('--g',g?.color||'var(--faint)');
-    const sub=g?[g.title&&esc(g.title),g.machine&&`<span style="color:var(--mach)">on ${esc(g.machine)}</span>`,g.dir&&`<span class="mono">${esc(g.dir)}/</span>`,g.args&&`<span class="mono">${esc(g.args)}</span>`,
-        g.env_keys.length&&`env: ${g.env_keys.map(esc).join(', ')}`].filter(Boolean).join(' · ')
+    const sub=g?[g.title&&esc(g.title),g.machines?.length?`<span style="color:var(--mach)" title="Bound: this headline's tests run only on ${esc(g.machines.join(', '))} (machines = in pytest-board.ini); ${esc(g.machine)} is the default">only on ${g.machines.map(esc).join(', ')}</span>`
+      :g.machine&&`<span style="color:var(--mach)">on ${esc(g.machine)}</span>`,g.dir&&`<span class="mono">${esc(g.dir)}/</span>`,g.args&&`<span class="mono">${esc(g.args)}</span>`,
+        g.env_keys.length&&`env: ${g.env_keys.map(esc).join(', ')}`,
+        g.env_file&&`<span class="mono" title="${esc(g.env_file.path)}${g.env_file.exists?': '+esc(g.env_file.keys.join(', ')):' (not found)'}">${esc(g.env_file.path.split('/').pop())}</span>${g.env_file.exists?'':' <span class="warn">not found</span>'}`].filter(Boolean).join(' · ')
       :k?`<span class="warn">Not in the config file.</span> Add a [${esc(k)}] section or move these tests.`:'Tests without a headline';
     box.innerHTML=`<div class="grp-head">
         <button class="icon" data-act="toggle" title="Collapse">${I.caret}</button><span class="gdot"></span>
@@ -988,32 +1101,6 @@ function renderLibrary(){
   }
   if(!list.children.length) list.innerHTML=`<div class="lib-empty">${f?'No tests match.':'No tests yet.'}</div>`;
 }
-// machine dropdown on a library test: default (headline / this server), this server, or any machine
-function libMachineOptions(t){
-  const g=grpInfo(t.grp), def=g?.machine?`default · ${g.machine}`:'default · this server';
-  const names=(S.machines||[]).filter(m=>m.name!=='local').map(m=>m.name);
-  if(t.machine&&t.machine!=='local'&&!names.includes(t.machine)) names.push(t.machine);
-  return `<option value="">${esc(def)}</option><option value="local">this server</option>`+
-    names.map(n=>`<option value="${esc(n)}">${esc(n)}${machInfo(n)?({offline:' · offline',warn:' · needs attention'}[machInfo(n).status?.state]||''):' · not defined'}</option>`).join('');
-}
-function wireLibMachine(el,t){
-  const sel=el.querySelector('.lib-mach');
-  sel.innerHTML=libMachineOptions(t); sel.value=t.machine||'';
-  const r=resolveMachine(t);
-  sel.classList.toggle('inherit',!t.machine);
-  sel.classList.toggle('missing',r.name!=='local'&&!machInfo(r.name));
-  sel.title=r.src==='headline'?`Runs on ${r.name} (headline ${t.grp} default)`:r.src==='card'?`Runs on ${machLabel(r.name)}`:'Runs on this server';
-  // keep the dropdown usable inside a draggable item
-  const hold=()=>{el.draggable=false}, release=()=>{el.draggable=true};
-  sel.addEventListener('mousedown',e=>{e.stopPropagation();hold()});
-  sel.addEventListener('click',e=>e.stopPropagation());
-  sel.addEventListener('blur',()=>{release();if(pendingRender&&!dragging)setTimeout(()=>{pendingRender=false;render()},50)});
-  sel.addEventListener('change',()=>{
-    const v=sel.value||null; release(); sel.blur();
-    api('PATCH',`/tests/${t.id}`,{machine:v})
-      .then(()=>{toast(`“${t.name}” ${v?'runs on '+machLabel(v):'uses its default machine'}`);refresh(true)}).catch(fail);
-  });
-}
 function libItem(t,g){
   {
     const el=document.createElement('div'); el.className='lib-item'; el.draggable=true; el.dataset.test=t.id;
@@ -1024,11 +1111,9 @@ function libItem(t,g){
     el.innerHTML=`<div class="card-top"><span class="card-title">${esc(t.name)}</span>
         <button class="icon quick" data-act="del" title="Delete from library">${I.trash}</button></div>
       <div class="target mono" style="color:var(--muted);word-break:break-all;margin-top:2px">${esc(t.target||'(whole suite)')}${t.args?' <span style="color:var(--faint)">'+esc(t.args)+'</span>':''}</div>
-      <div class="lib-mrow" title="Machine this test's copies run on">${I.server}<select class="lib-mach" aria-label="Machine for ${esc(t.name)}"></select></div>
+      ${branchPill(t)?`<div style="margin-top:4px">${branchPill(t)}</div>`:''}
       ${meta?`<div class="meta">${meta}</div>`:''}`;
-    wireLibMachine(el,t);
     el.onclick=e=>{
-      if(e.target.closest('.lib-mrow')) return;
       if(e.target.closest('[data-act=del]')){
         e.stopPropagation();
         if(confirm(`Delete “${t.name}” from the library?\nCopies already on the board stay; its run history is kept.`))
@@ -1048,14 +1133,14 @@ $('#libSearch').oninput=renderLibrary;
   const target=e=>e.target.closest?.('.lib-group');
   const clear=()=>lib.querySelectorAll('.lib-group.over').forEach(x=>x.classList.remove('over'));
   lib.addEventListener('dragover',e=>{
-    if(!dragging||dragging._test||dragging._machine)return;
+    if(!dragging||dragging._test)return;
     e.preventDefault();e.dataTransfer.dropEffect='move';lib.classList.add('over');
     const gEl=target(e); clear(); gEl?.classList.add('over');
   });
   lib.addEventListener('dragleave',e=>{if(!lib.contains(e.relatedTarget)){lib.classList.remove('over');clear()}});
   lib.addEventListener('drop',e=>{
     e.preventDefault(); lib.classList.remove('over'); const gEl=target(e); clear();
-    if(!dragging||dragging._test||dragging._machine) return;
+    if(!dragging||dragging._test) return;
     const c=dragging, grp=gEl?gEl.dataset.grp||null:(c.grp||null);
     api('POST',`/cards/${c.id}/save-to-library`,{grp}).then(t=>{toast(`Saved “${t.name}” under ${grp||'no headline'}`);refresh(true)}).catch(fail);
   });
@@ -1063,7 +1148,7 @@ $('#libSearch').oninput=renderLibrary;
 async function copyTest(t,lane,status,position,groupSet){
   // dropped on an option-set group: that set is ticked; otherwise the ones picked for this test last time
   const optsets=await askOptsets(t,lane,status,groupSet); if(optsets===null) return;
-  const body={machine:lane,status,position,optsets};
+  const body={machine:lane,status,position,optsets:oneSet(optsets),extra_args:optsets.extra,combine:true};
   if(status==='scheduled'){const s=await askSchedule({title:t.name,cron:null,run_at:null});if(!s)return;Object.assign(body,s)}
   try{
     const d=await api('POST',`/tests/${t.id}/copy`,body);
@@ -1075,34 +1160,29 @@ async function copyTest(t,lane,status,position,groupSet){
 let ph=null;
 function wireCell(cell){
   cell.addEventListener('dragover',e=>{
-    if(!allowed(cell.dataset.status)) return;
+    if(!allowed(cell.dataset.status,cell.dataset.lane)) return;
     e.preventDefault(); e.dataTransfer.dropEffect=dragging._test?'copy':'move';
     cell.classList.add('over');
     if(!ph){ph=document.createElement('div');ph.className='placeholder'}
     cell.querySelector('.empty')?.style.setProperty('display','none');
-    // over an option-set group: the placeholder goes into that group (and the card takes its option set)
-    const grp=e.target.closest?.('.tgroup'), box=grp&&cell.contains(grp)?grp.querySelector('.tg-cards'):cell;
-    cell.querySelectorAll('.tgroup.over').forEach(x=>x!==grp&&x.classList.remove('over')); grp?.classList.add('over');
-    const after=[...box.querySelectorAll(':scope > .card:not(.ghost)')].find(k=>{const r=k.getBoundingClientRect();return e.clientY<r.top+r.height/2});
-    if(after) box.insertBefore(ph,after); else box.append(ph);
+    const after=[...cell.querySelectorAll(':scope > .card:not(.ghost)')].find(k=>{const r=k.getBoundingClientRect();return e.clientY<r.top+r.height/2});
+    if(after) cell.insertBefore(ph,after); else cell.append(ph);
   });
   cell.addEventListener('dragleave',e=>{
     if(cell.contains(e.relatedTarget)) return;
     cell.classList.remove('over'); if(ph&&cell.contains(ph)) ph.remove();
-    cell.querySelectorAll('.tgroup.over').forEach(x=>x.classList.remove('over'));
     cell.querySelector('.empty')?.style.removeProperty('display');
   });
   cell.addEventListener('drop',e=>{
-    e.preventDefault(); if(!dragging||dragging._machine) return;
+    e.preventDefault(); if(!dragging||!allowed(cell.dataset.status,cell.dataset.lane)) return;
     const card=dragging;
     const sib=(n,dir)=>{while(n&&(!n.classList?.contains('card')||n.classList.contains('ghost')))n=n[dir];return n};
     const prev=sib(ph?.previousElementSibling,'previousElementSibling'), next=sib(ph?.nextElementSibling,'nextElementSibling');
     const pos=k=>S.cards.find(x=>x.id==k.dataset.id)?.position??0;
     const position=prev&&next?(pos(prev)+pos(next))/2:prev?pos(prev)+1:next?pos(next)-1:1;
-    const optset=ph?.closest('.tgroup')?.dataset.optset;  // undefined: dropped outside an option-set group
-    ph?.remove(); cell.classList.remove('over'); cell.querySelectorAll('.tgroup.over').forEach(x=>x.classList.remove('over'));
-    if(card._test) copyTest(card,cell.dataset.lane,cell.dataset.status,position,optset);
-    else moveCard(card,cell.dataset.lane,cell.dataset.status,position,optset);
+    ph?.remove(); cell.classList.remove('over');
+    if(card._test) copyTest(card,cell.dataset.lane,cell.dataset.status,position);
+    else moveCard(card,cell.dataset.lane,cell.dataset.status,position);
   });
 }
 
@@ -1164,14 +1244,90 @@ function askSchedule(card){
   });
 }
 
+/* ---------------- movable, resizable dialogs */
+// Drag the title bar to move, an edge or a corner to resize. Size and position are remembered in this browser (a
+// per-viewer convenience). Double-click the title bar to center the window, an edge or the grip for the default size.
+const RZ_MIN={w:640,h:420}, RZ_M=8;  // smallest size; gap kept to the browser window's edges
+const boxKey=(dlg,k)=>`pb.${k}.${dlg.id}`;
+function boxLoad(dlg,k){try{return JSON.parse(localStorage.getItem(boxKey(dlg,k))||'null')}catch(e){return null}}
+function boxSave(dlg,k,v){try{v?localStorage.setItem(boxKey(dlg,k),JSON.stringify(v)):localStorage.removeItem(boxKey(dlg,k))}catch(e){}}
+function pinBox(dlg,left,top,w,h){Object.assign(dlg.style,{margin:'0',inset:'auto',left:left+'px',top:top+'px',width:w+'px',height:h+'px'})}
+function centerBox(dlg){Object.assign(dlg.style,{margin:'',inset:'',left:'',top:''})}
+function fitBox(dlg){  // a pinned window stays inside the browser window (after it got smaller, say)
+  if(!dlg.open||dlg.style.left==='') return;
+  const r=dlg.getBoundingClientRect(), W=innerWidth, H=innerHeight;
+  const w=Math.min(r.width,W-2*RZ_M), h=Math.min(r.height,H-2*RZ_M);
+  pinBox(dlg,Math.max(RZ_M,Math.min(r.left,W-w-RZ_M)),Math.max(RZ_M,Math.min(r.top,H-h-RZ_M)),w,h);
+}
+function restoreBox(dlg){  // call right after showModal(): the remembered size and place, or the default, centered
+  centerBox(dlg); Object.assign(dlg.style,{width:'',height:''});
+  const sz=boxLoad(dlg,'size'), pos=boxLoad(dlg,'pos');
+  if(sz?.w&&sz?.h) Object.assign(dlg.style,{width:Math.min(sz.w,innerWidth-2*RZ_M)+'px',height:Math.min(sz.h,innerHeight-2*RZ_M)+'px'});
+  if(pos&&Number.isFinite(pos.x)&&Number.isFinite(pos.y)){
+    const r=dlg.getBoundingClientRect(); pinBox(dlg,pos.x,pos.y,r.width,r.height); fitBox(dlg);
+  }
+}
+const allBoxes=[];
+addEventListener('resize',()=>allBoxes.forEach(fitBox));
+function makeWindow(dlg){
+  allBoxes.push(dlg);
+  for(const d of ['n','s','e','w','ne','nw','se','sw']){
+    const h=document.createElement('div'); h.className='rz '+d; h.dataset.dir=d;
+    h.title=d==='se'?'Drag to resize · double-click for the default size':''; dlg.append(h);
+  }
+  const head=dlg.querySelector('.dlg-head'); head.classList.add('drag-handle');
+  head.title='Drag to move · double-click to center';
+  let st=null;
+  const busy=cursor=>{document.body.classList.add('resizing');document.body.style.cursor=cursor};
+  dlg.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    const h=e.target.closest?.('.rz'), onHead=!h&&e.target.closest?.('.dlg-head')===head&&!e.target.closest('button,a,input,select,textarea,label');
+    if(!h&&!onHead) return;
+    e.preventDefault(); const r=dlg.getBoundingClientRect();
+    st={dir:h?h.dataset.dir:'move',x:e.clientX,y:e.clientY,r}; (h||head).setPointerCapture(e.pointerId);
+    // pin the window where it is: the dragged edge (or the whole window) follows the pointer
+    pinBox(dlg,r.left,r.top,r.width,r.height);
+    busy(h?getComputedStyle(h).cursor:'move');
+  });
+  dlg.addEventListener('pointermove',e=>{
+    if(!st) return;
+    const {dir,x,y,r}=st, m=RZ_M, W=innerWidth, H=innerHeight, dx=e.clientX-x, dy=e.clientY-y;
+    if(dir==='move'){
+      pinBox(dlg,Math.max(m,Math.min(r.left+dx,W-r.width-m)),Math.max(m,Math.min(r.top+dy,H-r.height-m)),r.width,r.height);
+      return;
+    }
+    const minW=Math.min(RZ_MIN.w,W-2*m), minH=Math.min(RZ_MIN.h,H-2*m);
+    let {left,top,right,bottom}=r;
+    if(dir.includes('e')) right=Math.min(W-m,Math.max(left+minW,r.right+dx));
+    if(dir.includes('w')) left=Math.max(m,Math.min(right-minW,r.left+dx));
+    if(dir.includes('s')) bottom=Math.min(H-m,Math.max(top+minH,r.bottom+dy));
+    if(dir.includes('n')) top=Math.max(m,Math.min(bottom-minH,r.top+dy));
+    pinBox(dlg,left,top,right-left,bottom-top);
+  });
+  const end=()=>{
+    if(!st) return;
+    const moved=st.dir==='move'; st=null;
+    document.body.classList.remove('resizing'); document.body.style.cursor='';
+    const r=dlg.getBoundingClientRect();
+    boxSave(dlg,'pos',{x:Math.round(r.left),y:Math.round(r.top)});
+    if(!moved) boxSave(dlg,'size',{w:Math.round(r.width),h:Math.round(r.height)});
+  };
+  dlg.addEventListener('pointerup',end); dlg.addEventListener('pointercancel',end);
+  dlg.addEventListener('dblclick',e=>{
+    if(e.target.closest?.('.rz')){boxSave(dlg,'size',null);boxSave(dlg,'pos',null);restoreBox(dlg);return}  // default size, centered
+    if(e.target.closest?.('.dlg-head')===head&&!e.target.closest('button,a,input,select,textarea')){boxSave(dlg,'pos',null);centerBox(dlg)}
+  });
+}
+
 /* ---------------- card dialog */
 const cardDlg=$('#cardDlg');
+makeWindow(cardDlg);
 let cd={id:null,data:null,runId:null,offset:0,timer:null};
 // kind: 'card' (a copy on the board) or 'test' (a library test). id==null -> create a new library test.
 async function openCard(id,laneId,kind='card',grp){
   cd={kind,id,data:null,runId:null,offset:0,timer:null};
   const isTest=kind==='test', isNew=id==null;
-  for(const f of ['fTitle','fTarget','fArgs','fEnv','fTimeout','fOpt']) $('#'+f).value='';
+  for(const f of ['fTitle','fTarget','fArgs','fEnv','fTimeout','fOpt','fBranch']) $('#'+f).value='';
   const defGrp=grp!==undefined?grp:(grpSel!=='*'?grpSel:(S.groups||[])[0]?.key);
   groupOptions($('#fGroup'),defGrp??''); groupInfo(); machineOptions('');
   $('#cdRuns').innerHTML=''; $('#cdLog').innerHTML=''; $('#cdCmd').textContent='—';
@@ -1179,13 +1335,16 @@ async function openCard(id,laneId,kind='card',grp){
   $('#cdDot').className='dot'+(isTest?'':' backlog'); $('#cdDot').style.background=isTest?'var(--accent)':'';
   $('#lblTitle').textContent=isTest?'Name':'Title';
   $('#fOptWrap').hidden=isTest;  // library tests get their option sets when they're put on the board
+  $('#fBranchWrap').hidden=isTest;  // a branch is set on a card (or its headline), not on the library test
+  $('#fMachineWrap').hidden=isTest;  // so is the machine: a copy runs on the row it is dropped into
   ['cdDelete','cdSchedule','cdStop','cdRun'].forEach(b=>$('#'+b).hidden=isNew);
+  $('#cdAttach').hidden=true;
   $('#cdSaveLib').hidden=true; $('#cdFootSpacer').hidden=!isNew;
   $('#cdSchedWrap').hidden=isNew;
   $('#cdLog').innerHTML=`<div class="nolog" style="padding:40px;text-align:center;color:var(--faint)">${isNew?'Once saved, drag the test from the library onto the board to run a copy of it.':'Loading…'}</div>`;
   $('#junitLink').hidden=true;
-  $('#cdSave').textContent=isNew?'Add to library':'Save';
-  cardDlg.showModal();
+  $('#cdSave').textContent=isNew?'Add to library':'Save and close';
+  cardDlg.showModal(); restoreBox(cardDlg);
   if(isNew){$('#fTarget').focus();return}
   await loadCard(true);
 }
@@ -1196,11 +1355,11 @@ async function loadCard(fill){
   cd.data=c;
   if(fill){
     $('#fTitle').value=isTest?c.name:c.title; $('#fTarget').value=c.target; $('#fArgs').value=c.args; $('#fEnv').value=c.env;
-    $('#fTimeout').value=c.timeout||''; $('#fOpt').value=c.optset??'';
+    $('#fTimeout').value=c.timeout||''; $('#fOpt').value=c.optset??''; $('#fBranch').value=c.branch||'';
     groupOptions($('#fGroup'),c.grp||''); groupInfo(); machineOptions(c.machine||'');
   }
-  $('#cdCmd').textContent=c.run_machine==='local'?`cd ${c.cwd}\n${c.command_preview}`
-    :c.machine_missing?c.command_preview:`ssh ${c.ssh}  (${c.run_machine})\ncd ${c.cwd.split(':').pop()}\n${c.command_preview}`;
+  const co=c.run_branch?`git fetch && git checkout ${c.run_branch}   (in the project folder${c.run_branch_source==='headline'?', branch from the headline':''})\n`:'';
+  $('#cdCmd').textContent=c.machine_missing?c.command_preview:`ssh ${c.ssh}  (${c.run_machine})\n${co}cd ${c.cwd.split(':').pop()}\n${c.command_preview}`;
   $('#cdCmd').style.whiteSpace='pre-wrap';
   if(isTest){
     $('#cdHead').textContent=c.name;
@@ -1215,6 +1374,11 @@ async function loadCard(fill){
     $('#cdStop').hidden=!['running','queued'].includes(c.status);
     $('#cdStop').textContent=c.status==='queued'?'Unqueue':'Stop';
     $('#cdRun').hidden=['running','queued'].includes(c.status);
+    // a run on a machine goes on in a screen session there: Attach opens a terminal in it
+    const live=c.status==='running'&&c.runs[0]?.outcome==='running'&&c.runs[0].detached?c.runs[0]:null, at=$('#cdAttach');
+    at.hidden=!live; at.disabled=!live?.session; cd.attach=live?.session?{run:live.id,session:live.session,machine:live.machine}:null;
+    at.title=!live?'':live.session?`Open a terminal in this run's screen session on ${live.machine}: watch it live, answer a debugger. Detach with Ctrl+A then D; the run keeps going.`
+      :`screen isn't installed on ${live.machine}, so this run has no session to attach to. Install it there (e.g. sudo apt install screen); later runs get one.`;
     $('#cdSaveLib').hidden=!!c.test_name; $('#cdFootSpacer').hidden=!c.test_name;
     $('#cdSchedWrap').querySelector('label').textContent='Schedule';
     const col=COLS.find(x=>x.key===c.status)?.label;
@@ -1222,15 +1386,15 @@ async function loadCard(fill){
       `Column: <b>${col}</b>. `+(c.cron?`Repeats <span class="mono">${esc(c.cron)}</span>${c.next_fires?' — next '+c.next_fires.map(t=>esc(fmtTime(t))).join(', '):''}.`
       :c.run_at?`Runs once ${esc(fmtTime(c.run_at))}.`:'Not scheduled — drag to Scheduled or use “Schedule…”.');
   }
-  const hasOpts=c.runs.some(r=>r.optset);
+  const hasOpts=c.runs.some(r=>r.optset), hasBr=c.runs.some(r=>r.branch);
   const rows=c.runs.map(r=>{
     const bad=(r.failed||0)+(r.errors||0);
-    const res=r.outcome==='running'?`<span class="pill run">${I.spin}running</span>`:r.outcome==='passed'?`<span class="pill ok">${I.check}passed</span>`:
+    const res=r.outcome==='running'?`<span class="pill run">${I.spin}running</span>${c.link&&r.id===c.last_run_id?` <span class="pill warn" title="${esc(linkTip(c,r.machine))}">${I.nolink}reconnecting</span>`:''}`:r.outcome==='passed'?`<span class="pill ok">${I.check}passed</span>`:
       r.outcome!=='cancelled'?`<span class="pill bad">${I.x}${esc(OUTCOME_LABEL[r.outcome]||r.outcome)}</span>`:`<span class="pill">${esc(r.outcome)}</span>`;
     return `<tr data-run="${r.id}" class="${r.id===cd.runId?'sel':''}"><td>#${r.id}</td><td>${res}</td>
       <td>${r.total!=null?`${r.passed} ✓ ${bad?'· '+bad+' ✗':''} ${r.skipped?'· '+r.skipped+' skip':''}`:'—'}</td>
-      <td>${esc(fmtTime(r.started))}</td><td>${r.finished?dur(r.finished-r.started):'…'}</td>${hasOpts?`<td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.optset||'')}">${esc(r.optset||'')}</td>`:''}<td>${esc(machLabel(r.machine||'local'))}</td><td style="color:var(--faint)">${esc(r.trigger||'')}</td></tr>`}).join('');
-  $('#cdRuns').innerHTML=c.runs.length?`<table><thead><tr><th>Run</th><th>Result</th><th>Tests</th><th>Started</th><th>Took</th>${hasOpts?'<th>Options</th>':''}<th>Machine</th><th>Trigger</th></tr></thead><tbody>${rows}</tbody></table>`
+      <td>${esc(fmtTime(r.started))}</td><td>${r.finished?dur(r.finished-r.started):'…'}</td>${hasBr?`<td class="mono" style="max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.branch||'')}">${esc(r.branch||'')}</td>`:''}${hasOpts?`<td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.optset||'')}">${esc(r.optset||'')}</td>`:''}<td>${esc(machLabel(r.machine||(r.outcome==='no-machine'?'':'local')))}</td><td style="color:var(--faint)">${esc(r.trigger||'')}</td></tr>`}).join('');
+  $('#cdRuns').innerHTML=c.runs.length?`<table><thead><tr><th>Run</th><th>Result</th><th>Tests</th><th>Started</th><th>Took</th>${hasBr?'<th>Branch</th>':''}${hasOpts?'<th>Options</th>':''}<th>Machine</th><th>Trigger</th></tr></thead><tbody>${rows}</tbody></table>`
     :'<div style="padding:14px;color:var(--faint)">No runs yet.</div>';
   $('#cdRuns').querySelectorAll('tr[data-run]').forEach(tr=>tr.onclick=()=>showRun(+tr.dataset.run));
   const latest=c.runs[0]?.id;
@@ -1259,27 +1423,40 @@ async function pollLog(rid){
     if(!d.done) cd.timer=setTimeout(()=>pollLog(rid),800);
   }catch(e){}
 }
+function branchInfo(){
+  const g=grpInfo($('#fGroup').value), el=$('#fBranchInfo'), own=$('#fBranch').value.trim();
+  $('#fBranch').placeholder=g?.branch?`default: ${g.branch} (from ${g.key})`:'none: the project folder as it is';
+  const b=own||g?.branch;
+  el.textContent=b?`Before pytest starts, the project folder is switched to the latest ${b} from its git remote (git fetch, then checkout). `+
+    `It stays on that branch afterwards. Runs on one machine use one branch at a time, so cards with other branches wait.`
+    :'Empty: pytest runs on whatever is checked out in the project folder.';
+}
+$('#fBranch').oninput=branchInfo;
 function groupInfo(){
+  branchInfo();
   const g=grpInfo($('#fGroup').value), el=$('#fGroupInfo');
   if(!$('#fGroup').value){el.textContent='';return}
   if(!g){el.innerHTML=`<span style="color:var(--queued)">This headline isn't in the config file, so nothing is inherited.</span>`;return}
   const bits=[g.dir&&`runs in <span class="mono">${esc(g.dir)}/</span>`,g.args&&`adds <span class="mono">${esc(g.args)}</span>`,
-    g.env_keys.length&&`env ${g.env_keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', ')}`].filter(Boolean);
+    g.env_keys.length&&`env ${g.env_keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', ')}`,
+    g.env_file&&(g.env_file.exists?`env file <span class="mono">${esc(g.env_file.path)}</span>${g.env_file.keys.length?' ('+g.env_file.keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', ')+')':''}`
+      :`<span style="color:var(--failed)">env file ${esc(g.env_file.path)} not found</span>`)].filter(Boolean);
   el.innerHTML=bits.length?`From <b>${esc(g.key)}</b>: ${bits.join(' · ')}. Values set here override the headline's env.`:'';
 }
 $('#fGroup').onchange=()=>{groupInfo();machineOptions($('#fMachine').value)};
 function machineOptions(selected){
   const sel=$('#fMachine'), g=grpInfo($('#fGroup').value);
-  const def=g?.machine?`Default: ${g.machine} (from ${g.key})`:'Default: this server';
-  const names=(S.machines||[]).filter(m=>m.name!=='local').map(m=>m.name);
+  const def=g?.machine&&g.machine!=='local'?`Default: ${g.machine} (from ${g.key})`:'No machine (pick one)';
+  const b=g?.machines||[], names=(S.machines||[]).map(m=>m.name).filter(n=>!b.length||b.includes(n));  // bound: those only
   if(selected&&selected!=='local'&&!names.includes(selected)) names.push(selected);
-  sel.innerHTML=`<option value="">${esc(def)}</option><option value="local">This server (${esc(machInfo('local')?.host||'local')})</option>`+
-    names.map(n=>{const m=machInfo(n);return `<option value="${esc(n)}">${esc(n)}${m?` — ${esc((m.user?m.user+'@':'')+m.host)}`:' (not defined)'}</option>`}).join('');
-  sel.value=selected||''; machineInfo();
+  sel.innerHTML=`<option value="">${esc(def)}</option>`+
+    names.map(n=>{const m=machInfo(n);return `<option value="${esc(n)}">${esc(n)}${m?` — ${esc((m.user?m.user+'@':'')+m.host)}`:' (not defined)'}${b.length&&!b.includes(n)?` (not a ${esc(g.key)} machine)`:''}</option>`}).join('');
+  sel.value=selected&&selected!=='local'?selected:''; machineInfo();
 }
 function machineInfo(){
   const v=$('#fMachine').value, r=resolveMachine({machine:v,grp:$('#fGroup').value}), m=machInfo(r.name), el=$('#fMachineInfo');
-  if(r.name==='local'){el.textContent='Runs on this server.';return}
+  if(!r.name){el.innerHTML=`<span style="color:var(--failed)">No machine: pick the one it runs on${$('#fGroup').value?', or set <span class="mono">machine =</span> for its headline':''}.</span>`;return}
+  if(!boundOk({grp:$('#fGroup').value},r.name)){el.innerHTML=`<span style="color:var(--failed)">${esc(boundTip({grp:$('#fGroup').value}))}: pick one of those.</span>`;return}
   if(!m){el.innerHTML=`<span style="color:var(--failed)">Machine “${esc(r.name)}” is not defined; runs will fail until you pick another.</span>`;return}
   const st=m.status?.state;
   el.innerHTML=`Runs over ssh on <span class="mono">${esc((m.user?m.user+'@':'')+m.host)}</span> in <span class="mono">${esc(m.workdir||'~')}</span>`+
@@ -1288,8 +1465,8 @@ function machineInfo(){
 $('#fMachine').onchange=machineInfo;
 function formBody(){
   const name=$('#fTitle').value.trim()||$('#fTarget').value.trim()||'all tests';
-  const b={target:$('#fTarget').value.trim(),args:$('#fArgs').value.trim(),env:$('#fEnv').value,timeout:+$('#fTimeout').value||0,grp:$('#fGroup').value||null,machine:$('#fMachine').value||null};
-  return cd.kind==='test'?{name,...b}:{title:name,...b,optset:$('#fOpt').value.trim()||null};
+  const b={target:$('#fTarget').value.trim(),args:$('#fArgs').value.trim(),env:$('#fEnv').value,timeout:+$('#fTimeout').value||0,grp:$('#fGroup').value||null};
+  return cd.kind==='test'?{name,...b}:{title:name,...b,machine:$('#fMachine').value||null,optset:$('#fOpt').value.trim()||null,branch:$('#fBranch').value.trim()||null};
 }
 const base=()=>cd.kind==='test'?'/tests':'/cards';
 $('#cdClose').onclick=()=>cardDlg.close();
@@ -1297,7 +1474,7 @@ cardDlg.addEventListener('close',()=>{clearTimeout(cd.timer);cd.id=null});
 $('#cdSave').onclick=async()=>{
   try{
     if(cd.id==null){const t=await api('POST','/tests',formBody());toast(`Added “${t.name}” to the library`);cardDlg.close();}
-    else{await api('PATCH',`${base()}/${cd.id}`,formBody());toast('Saved');await loadCard(true)}
+    else{const what=cd.kind==='test'?'library test':'card';await api('PATCH',`${base()}/${cd.id}`,formBody());toast(`Saved the ${what}`);cardDlg.close()}  // an error keeps the window open
     refresh(true);
   }catch(e){toast(e.message,true)}
 };
@@ -1306,12 +1483,13 @@ $('#cdRun').onclick=async()=>{
     await api('PATCH',`${base()}/${cd.id}`,formBody());
     if(cd.kind==='test'){
       const lane=resolveMachine(formBody()).name, optsets=await askOptsets(cd.data,lane,'queued',undefined,true); if(optsets===null) return;
-      const d=await api('POST',`/tests/${cd.id}/copy`,{status:'queued',optsets});
+      const d=await api('POST',`/tests/${cd.id}/copy`,{status:'queued',optsets:oneSet(optsets),extra_args:optsets.extra,combine:true});
       toast(`Added ${d.created} card${d.created===1?'':'s'} to ${machLabel(lane)} · Queued`)}
     else await api('POST',`/cards/${cd.id}/run`);
     cd.followLatest=true;cd.runId=-1;refresh(true);setTimeout(()=>loadCard(false),600);
   }catch(e){toast(e.message,true)}
 };
+$('#cdAttach').onclick=()=>{if(cd.attach)openShell(cd.attach.machine,cd.attach)};
 $('#cdStop').onclick=()=>api('POST',`/cards/${cd.id}/stop`).then(()=>{refresh(true);setTimeout(()=>loadCard(false),800)}).catch(e=>toast(e.message,true));
 $('#cdDelete').onclick=async()=>{
   const isTest=cd.kind==='test';
@@ -1325,7 +1503,7 @@ $('#cdSchedule').onclick=async()=>{
     const optsets=await askOptsets(c,resolveMachine(formBody()).name,'scheduled',undefined,true); if(optsets===null) return;
     const s=await askSchedule({title:c.name,cron:null,run_at:null}); if(!s) return;
     await api('PATCH',`/tests/${c.id}`,formBody()).catch(fail);
-    await api('POST',`/tests/${c.id}/copy`,{status:'scheduled',optsets,...s}).then(d=>toast(`Scheduled ${d.created} cop${d.created===1?'y':'ies'}`)).catch(fail);
+    await api('POST',`/tests/${c.id}/copy`,{status:'scheduled',optsets:oneSet(optsets),extra_args:optsets.extra,combine:true,...s}).then(d=>toast(`Scheduled ${d.created} cop${d.created===1?'y':'ies'}`)).catch(fail);
     refresh(true); loadCard(false); return;
   }
   if(c.status==='running'){toast('Stop it first, or wait for the run to finish',true);return}
@@ -1337,7 +1515,14 @@ $('#cdSchedule').onclick=async()=>{
 
 /* ---------------- machine dialog */
 const machDlg=$('#machDlg'); let md={name:null};
-const MF={mName:'name',mHost:'host',mUser:'user',mPort:'port',mSlots:'slots',mIdentity:'identity',mWorkdir:'workdir',mPython:'python',mEnv:'env',mSshOpts:'ssh_options',mNotes:'notes'};
+const MF={mName:'name',mHost:'host',mUser:'user',mPort:'port',mIdentity:'identity',mWorkdir:'workdir',mPython:'python',mEnv:'env',mSshOpts:'ssh_options',mNotes:'notes',
+  mEnvFile:'env_file',mRemoteEnv:'remote_env_file'};
+const ENV_FILE_HINT=$('#mEnvFileInfo').innerHTML;
+function envFileInfo(m){  // what the server found in a machine's env file (names only)
+  const i=m?.env_file_info, el=$('#mEnvFileInfo');
+  el.innerHTML=!i?ENV_FILE_HINT:!i.exists?`<span style="color:var(--failed)">Not found: <span class="mono">${esc(i.path)}</span></span>`
+    :`<span class="mono">${esc(i.path)}</span>: ${i.keys.length?i.keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', '):'no variables'}`+(i.error?`<br><span style="color:var(--failed)">${esc(i.error)}</span>`:'');
+}
 function statusBox(st){
   st=st||{state:'unknown'};
   const b=$('#mdStatus'); b.className='mstat st-'+st.state;
@@ -1354,9 +1539,9 @@ function fillMachineForm(m,skip=new Set()){
     if(skip.has(k)) continue;
     $('#'+id).value=m?(k==='env'?(m.env??(m.env_keys||[]).map(x=>x+'=…').join('\n')):(m[k]??'')):'';
   }
-  if(m&&m.slots===1&&!skip.has('slots')) $('#mSlots').value='';
   if(m&&m.python==='python3 -m pytest'&&!skip.has('python')) $('#mPython').value='';
   $('#mSync').checked=!!m?.sync;
+  envFileInfo(skip.size?null:m);
 }
 const CLONE_SKIP=new Set(['name','host']);  // a copy gets its own name and host / IP address
 let cloneFrom=null;
@@ -1390,7 +1575,7 @@ function openMachine(name,{clone}={}){
 }
 function machBody(){
   const b={}; for(const [id,k] of Object.entries(MF)) b[k]=$('#'+id).value.trim?.()??$('#'+id).value;
-  b.env=$('#mEnv').value; b.sync=$('#mSync').checked; b.port=b.port||null; b.slots=b.slots||1;
+  b.env=$('#mEnv').value; b.sync=$('#mSync').checked; b.port=b.port||null;
   if(!md.name&&cloneFrom) b.env_from=cloneFrom;  // the server fills in env values hidden from the browser
   return b;
 }
@@ -1401,11 +1586,10 @@ $('#btnCheckAll').onclick=()=>api('POST','/machines/check-all').then(d=>{toast(`
 $('#mdSave').onclick=async()=>{
   try{
     const r=md.name?await api('PATCH',`/machines/${encodeURIComponent(md.name)}`,machBody()):await api('POST','/machines',machBody());
-    toast(md.name?'Machine saved':`Added ${r.name}; testing the connection…`); md.name=r.name; await refresh(true);
-    $('#mdHead').textContent=r.name; $('#mdDelete').hidden=false; $('#mdCheck').hidden=false; $('#mdShell').hidden=false; $('#mdDup').hidden=false;
-    $('#mCloneWrap').hidden=true; cloneFrom=null; if(machInfo(r.name)?.env!=null) $('#mEnv').value=machInfo(r.name).env;
-    statusBox(machInfo(r.name)?.status);
-  }catch(e){toast(e.message,true)}
+    // the connection test's result shows on the machine in the Machines column
+    toast(md.name?`Saved ${r.name}; testing the connection…`:`Added ${r.name}; testing the connection…`);
+    machDlg.close(); refresh(true);
+  }catch(e){toast(e.message,true)}  // an error keeps the window open
 };
 $('#mdCheck').onclick=async()=>{
   statusBox({state:'checking'}); $('#mdCheck').disabled=true;
@@ -1420,20 +1604,55 @@ $('#mdDelete').onclick=async()=>{
 
 /* ---------------- discovery */
 const discDlg=$('#discDlg'); let discIds=[];
-$('#btnDiscover').onclick=()=>openDiscover(grpSel!=='*'?grpSel:(S.groups||[])[0]?.key||'');
-$('#discGroup').onchange=()=>runDiscover();
-function openDiscover(grp){
+// "Discover" in the library: pick the machine to collect on
+const discMenu=$('#discMenu');
+function closeDiscMenu(focus){discMenu.hidden=true;$('#btnDiscover').setAttribute('aria-expanded','false');if(focus)$('#btnDiscover').focus()}
+$('#btnDiscover').onclick=e=>{
+  e.stopPropagation();
+  if(!discMenu.hidden) return closeDiscMenu();
+  const ms=S.machines||[];
+  discMenu.innerHTML=(ms.length?'<div class="mh">Discover tests on</div>':'<div class="mh">No machines yet: add one in the Machines column first</div>')+ms.map(m=>{
+    const st=m.status?.state||'unknown', where=`${m.user?m.user+'@':''}${m.host}:${m.workdir||'~'}`;
+    return `<button class="mi st-${esc(st)}" role="menuitem" data-m="${esc(m.name)}" title="${esc(st==='offline'?'currently unreachable':where)}"><span class="st"></span><span>${esc(m.name)}</span><span class="where">${esc(where)}</span></button>`}).join('');
+  discMenu.hidden=false; $('#btnDiscover').setAttribute('aria-expanded','true'); discMenu.querySelector('.mi')?.focus();
+};
+discMenu.onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;closeDiscMenu();discoverOn(b.dataset.m)};
+discMenu.onkeydown=e=>{
+  const items=[...discMenu.querySelectorAll('.mi')], i=items.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();items[(i+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus()}
+  if(e.key==='Escape'){e.preventDefault();closeDiscMenu(true)}
+  if(e.key==='Tab') closeDiscMenu();
+};
+document.addEventListener('click',e=>{if(!discMenu.hidden&&!e.target.closest('.disc-wrap'))closeDiscMenu()});
+$('#discGroup').onchange=()=>{discMachines($('#discGroup').value,$('#discMachine').value);runDiscover()};
+$('#discMachine').onchange=()=>runDiscover();
+// grp: the headline the tests are added under; machine: where to collect (default: the headline's machine)
+function openDiscover(grp,machine){
   groupOptions($('#discGroup'),grp||''); $('#discFilter').value='';
+  discMachines(grp,machine||resolveMachine({grp}).name);
   discDlg.showModal(); runDiscover();
+}
+// the machines a headline's tests can be collected on: its bound ones (machines =), else every machine
+function discMachines(grp,want){
+  const ms=(S.machines||[]).filter(m=>boundOk({grp},m.name)), sel=$('#discMachine');
+  sel.innerHTML=ms.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}${m.status?.state==='offline'?' · offline':''}</option>`).join('');
+  sel.value=ms.some(m=>m.name===want)?want:(ms.find(m=>m.name===resolveMachine({grp}).name)||ms[0])?.name||'';
+}
+// Discover on one machine: under a headline that runs there (the selected one, else the first such)
+function discoverOn(name){
+  const gs=S.groups||[], ok=x=>boundOk({grp:x.key},name);
+  const g=grpSel!=='*'&&boundOk({grp:grpSel},name)?grpSel:(gs.find(x=>x.machine===name&&ok(x))||gs.find(ok))?.key||'';
+  openDiscover(g,name);
 }
 let discSeq=0;
 async function runDiscover(){
-  const grp=$('#discGroup').value, seq=++discSeq; discIds=[];
+  const grp=$('#discGroup').value, mach=$('#discMachine').value, seq=++discSeq; discIds=[];
   $('#discWhere').textContent='';
-  $('#discBody').innerHTML='<div style="padding:30px;text-align:center;color:var(--faint)">Running pytest --collect-only…</div>'; updDisc();
+  if(!mach){$('#discBody').innerHTML='<div style="padding:30px;text-align:center;color:var(--faint)">No machines yet: tests are discovered on a machine. Add one in the Machines column first.</div>';updDisc();return}
+  $('#discBody').innerHTML=`<div style="padding:30px;text-align:center;color:var(--faint)">Running pytest --collect-only on ${esc(mach)}…</div>`; updDisc();
   try{
-    const d=await api('GET','/discover?grp='+encodeURIComponent(grp)); if(seq!==discSeq) return; discIds=d.ids;
-    $('#discWhere').textContent=`in ${d.cwd}`;
+    const d=await api('GET','/discover?grp='+encodeURIComponent(grp)+'&machine='+encodeURIComponent(mach)); if(seq!==discSeq) return; discIds=d.ids||[];
+    $('#discWhere').textContent=d.cwd?`in ${d.cwd}${d.branch?' · branch '+d.branch:''}`:'';
     if(d.error&&!d.ids.length){$('#discBody').innerHTML=`<pre class="log" style="margin:0;max-height:40vh">${esc(d.error)}</pre>`;return}
     if(d.error) toast('Collection had errors; showing what was collected',true);
     drawDisc();
@@ -1507,37 +1726,49 @@ $('#hPick').onchange=()=>{const m=machInfo($('#hPick').value);fillHelp(m||{})};
 Object.keys(HF).forEach(id=>$('#'+id).addEventListener('input',drawHelp));
 function drawHelp(){
   const v=k=>$('#'+Object.keys(HF).find(id=>HF[id]===k)).value.trim();
-  const srv=S.server||{}, me=srv.user||'the board user', box=srv.hostname||machInfo('local')?.host||'this server';
+  const srv=S.server||{}, me=srv.user||'the board user', box=srv.hostname||'this server';
   const name=v('name')||'lab-01', host=v('host')||'HOST', user=v('user'), port=v('port'), keyIn=v('identity'), key=keyIn||DEF_KEY;
   const wd=v('workdir')||'~/git', py=v('python')||'python3 -m pytest', opts=helpDlg._sshOpts||'';  // same defaults as the server
   const dest=shq(user?`${user}@${host}`:host), P=port?` -p ${shq(port)}`:'', O=opts?` ${opts}`:'';
-  const existing=!!machInfo($('#hPick').value);
+  const existing=!!machInfo($('#hPick').value), win=srv.os==='windows';
+  // PowerShell (board on Windows): key paths under $env:USERPROFILE, 'single quotes' escaped by doubling
+  const psq=t=>`'${String(t).replace(/'/g,"''")}'`;
+  const wpath=k=>k.startsWith('~/')||k.startsWith('~\\')?`"$env:USERPROFILE\\${k.slice(2).replace(/\//g,'\\')}"`:`"${k}"`;
   $('#hIntro').innerHTML=`The board connects to machines with <b>ssh</b>, as the account it runs as: <b class="mono">${esc(me)}</b> on <b class="mono">${esc(box)}</b>.
-    It only uses key-based login (it never asks for a password), so run steps 1–3 <b>once per machine, as ${esc(me)}, on ${esc(box)}</b>.
-    If the board runs as a systemd service, that's the <code class="mono">User=</code> in <span class="mono">pytest-board.service</span>; switch to it with <code class="mono">sudo -iu ${esc(me)}</code>.`;
+    It only uses key-based login (it never asks for a password), so run steps 1–3 <b>once per machine, as ${esc(me)}, on ${esc(box)}</b>`+
+    (win?`, in <b>PowerShell</b>. If the board runs as a service or scheduled task, that's the account it runs under.`
+      :`. If the board runs as a systemd service, that's the <code class="mono">User=</code> in <span class="mono">pytest-board.service</span>; switch to it with <code class="mono">sudo -iu ${esc(me)}</code>.`);
   const cmd=(c)=>`<div class="hcmd"><pre>${esc(c)}</pre><button type="button" data-copy="${esc(c)}">Copy</button></div>`;
   const step=(n,title,body)=>`<div class="hstep"><div class="hnum">${n}</div><div><h3>${title}</h3>${body}</div></div>`;
   const remote=`cd ${shq(wd)} && ${py} --version`;  // py is already shell syntax
   const ini=[`[machine:${name}]`,`host     = ${v('host')||'HOST'}`,user&&`user     = ${user}`,port&&`port     = ${port}`,`identity = ${key}`,
     v('workdir')&&`workdir  = ${v('workdir')}`,v('python')&&`python   = ${v('python')}`].filter(Boolean).join('\n');
-  $('#hSteps').innerHTML=
-    step(1,'Create a key for the board',`<p>Skip this if <code>${esc(key)}</code> already exists. <code>-N ''</code> gives it no passphrase, so the board can use it unattended.</p>`+
-      cmd(`ssh-keygen -t ed25519 -f ${shq(key)} -N ''`))+
-    step(2,'Copy the public key to the machine',`<p>This asks for the password of <code>${esc(user||me)}</code> on <code>${esc(host)}</code> one last time.</p>`+
-      cmd(`ssh-copy-id -i ${shq(key+'.pub')}${P}${O} ${dest}`))+
-    step(3,'Check that it works without a password',`<p>It should print the pytest version without asking anything. On the very first connection you may be asked to accept the host key: answer <code>yes</code>.</p>`+
-      cmd(`ssh -i ${shq(key)}${P}${O} ${dest} ${shq(remote)}`)+
-      (helpDlg._sync?`<p>This machine uses <b>sync</b>, so the folder is created on the first run; "No such file or directory" is fine here as long as you got in without a password.</p>`:''))+
+  const wdest=user?`${user}@${host}`:host;
+  const syncNote=helpDlg._sync?`<p>This machine uses <b>sync</b>, so the folder is created on the first run; "No such file or directory" is fine here as long as you got in without a password.</p>`:'';
+  const s1=win
+    ?step(1,'Create a key for the board',`<p>Skip this if <code>${esc(key)}</code> already exists. When it asks for a passphrase, press <b>Enter twice</b>: no passphrase, so the board can use the key unattended.</p>`+
+        cmd(`ssh-keygen -t ed25519 -f ${wpath(key)}`))
+    :step(1,'Create a key for the board',`<p>Skip this if <code>${esc(key)}</code> already exists. <code>-N ''</code> gives it no passphrase, so the board can use it unattended.</p>`+
+        cmd(`ssh-keygen -t ed25519 -f ${shq(key)} -N ''`));
+  const s2=win
+    ?step(2,'Copy the public key to the machine',`<p>Windows has no <code>ssh-copy-id</code>; this does the same. It asks for the password of <code>${esc(user||me)}</code> on <code>${esc(host)}</code> one last time.</p>`+
+        cmd(`type ${wpath(key+'.pub')} | ssh${P}${O} ${wdest} "mkdir -p ~/.ssh && chmod 700 ~/.ssh && tr -d '\\r' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"`))
+    :step(2,'Copy the public key to the machine',`<p>This asks for the password of <code>${esc(user||me)}</code> on <code>${esc(host)}</code> one last time.</p>`+
+        cmd(`ssh-copy-id -i ${shq(key+'.pub')}${P}${O} ${dest}`));
+  const s3=step(3,'Check that it works without a password',`<p>It should print the pytest version without asking anything. On the very first connection you may be asked to accept the host key: answer <code>yes</code>.</p>`+
+      cmd(win?`ssh -i ${wpath(key)}${P}${O} ${wdest} ${psq(remote)}`:`ssh -i ${shq(key)}${P}${O} ${dest} ${shq(remote)}`)+syncNote);
+  $('#hSteps').innerHTML=s1+s2+s3+
     step(4,existing?`Point the board at the key`:'Add the machine to the board',
       `<p>${existing?`Open <b>${esc(name)}</b> in the Machines column and set <b>Private key file</b> to <code>${esc(key)}</code>`:`Press <b>Add this machine</b> below (or <b>Add</b> in the Machines column) and set <b>Private key file</b> to <code>${esc(key)}</code>`}. Or put it in <span class="mono">pytest-board.ini</span>:</p>`+cmd(ini))+
     step(5,'Test the connection',`<p>Press <b>Test connection</b> in the machine's dialog, or <b>Check all</b>. The machine turns <b style="color:var(--passed)">green</b> when it's ready,
       <b style="color:var(--queued)">amber</b> when ssh works but the project folder or pytest is missing, and <b style="color:var(--failed)">red</b> when it can't connect.</p>`);
   $('#hNotes').innerHTML=[
     `New host keys are accepted on the first connection; a <b>changed</b> host key is refused. If the machine was reinstalled, remove the old key and connect once: <code>ssh-keygen -R ${esc(shq(host))}</code>`,
-    `Anything in <code>~/.ssh/config</code> of <b>${esc(me)}</b> applies too (aliases, ProxyJump, ports), and so do the machine's <b>Extra ssh options</b>, e.g. <code>-o ProxyJump=bastion</code>.`,
-    `The key file path is on this server, not on the machine.`,
-    `Need to create the project folder or a venv on the machine? Open the machine and press <b>Open shell</b>: it gives you a terminal there, in the project folder.`,
-    `Needed: the OpenSSH client (<code>ssh</code>) on this server; <code>rsync</code> on both ends only if you use sync; <code>sh</code> and Python with pytest on the machine. Nothing from pytest-board is installed there.`,
+    `Anything in <code>${win?'%USERPROFILE%\\.ssh\\config':'~/.ssh/config'}</code> of <b>${esc(me)}</b> applies too (aliases, ProxyJump, ports), and so do the machine's <b>Extra ssh options</b>, e.g. <code>-o ProxyJump=bastion</code>.`,
+    `The key file path is on this server, not on the machine${win?` (<code>~</code> there means <code>%USERPROFILE%</code>)`:''}.`,
+    `Need to create the project folder or a venv on the machine? Open the machine and press <b>Open shell</b>: it gives you a terminal there, in the project folder.${win?' On Windows it needs key login (it can\'t ask for a password), and it keeps the window size it opened with.':''}`,
+    win?`Needed: the OpenSSH client on this server (built into Windows 10/11: <i>Settings → Apps → Optional features → OpenSSH Client</i>); <code>sh</code>, <code>tar</code> and Python with pytest on the machine. Sync copies the project with tar over ssh, so no rsync is needed. Nothing from pytest-board is installed on the machine.`
+      :`Needed: the OpenSSH client (<code>ssh</code>) on this server; <code>sh</code> and Python with pytest on the machine. For sync, <code>rsync</code> on both ends makes it faster (only changed files are sent); without it the board copies with tar over ssh. Nothing from pytest-board is installed on the machine.`,
   ].map(x=>`<li>${x}</li>`).join('');
   $('#hAdd').textContent=existing?`Open ${name}`:'Add this machine';
 }
@@ -1574,7 +1805,7 @@ class MiniTerm{
     [this.sbEl,this.scrEl,this.measureEl]=el.children;
     this.reset();
     el.addEventListener('keydown',e=>this.key(e));
-    el.addEventListener('paste',e=>{const t=e.clipboardData?.getData('text');if(t){e.preventDefault();this.paste(t)}});
+    el.addEventListener('paste',e=>{this._pasted=true;const t=e.clipboardData?.getData('text');if(t){e.preventDefault();this.paste(t)}});
     el.addEventListener('mouseup',()=>{if(!String(getSelection()))el.focus({preventScroll:true})});
     el.addEventListener('focus',()=>this.dirty()); el.addEventListener('blur',()=>this.dirty());
   }
@@ -1801,6 +2032,13 @@ class MiniTerm{
     if(e.isComposing) return;
     const k=e.key, ctrl=e.ctrlKey, alt=e.altKey, shift=e.shiftKey;
     if((ctrl||e.metaKey)&&!alt&&/^[cC]$/.test(k)&&(String(getSelection())||shift||e.metaKey)) return;  // copy
+    if(ctrl&&!shift&&!alt&&k==='Insert'&&String(getSelection())) return;  // Ctrl+Insert copies the selection
+    if(shift&&!ctrl&&!alt&&!e.metaKey&&k==='Insert'){  // Shift+Insert pastes, like Ctrl+V
+      // the browser's paste event normally follows; if it doesn't, read the clipboard (needs https or localhost)
+      this._pasted=false;
+      setTimeout(()=>{if(!this._pasted&&navigator.clipboard?.readText)navigator.clipboard.readText().then(t=>{if(t)this.paste(t)}).catch(()=>{})},150);
+      return;
+    }
     if((ctrl||e.metaKey)&&/^[vV]$/.test(k)) return;  // paste (handled by the paste event)
     if(e.metaKey) return;
     if(shift&&(k==='PageUp'||k==='PageDown')){e.preventDefault();this.el.scrollTop+=(k==='PageUp'?-.9:.9)*this.el.clientHeight;return}
@@ -1841,9 +2079,11 @@ class MiniTerm{
 
 /* ---------------- "Open shell": an ssh terminal on a machine, in the browser */
 const shellDlg=$('#shellDlg');
+makeWindow(shellDlg);  // movable and resizable like the card window; the terminal re-fits as it changes
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const b64bytes=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-let shell={id:null,name:null,term:null,off:0,q:'',sending:false,gen:0,closed:true};
+let shell={id:null,name:null,att:null,term:null,off:0,q:'',sending:false,gen:0,closed:true};
+const SH_HINT=$('#shHint').innerHTML;
 function shellState(st,code){
   const el=$('#shState'); el.className='sh-state '+st;
   el.textContent=st==='open'?'connected':st==='connecting'?'connecting…':'closed'+(code?` · exit ${code}`:'');
@@ -1856,16 +2096,25 @@ function shellTerm(){
   }
   return shell.term;
 }
+let shResizeTimer=null;
 function shellFit(){
   const t=shell.term; if(!t||!shellDlg.open) return;
   const {cols,rows}=t.fit();
-  if(t.resize(cols,rows)&&shell.id&&!shell.closed) api('POST',`/shells/${shell.id}/resize`,{cols,rows}).catch(()=>{});
+  if(t.resize(cols,rows)&&shell.id&&!shell.closed){  // tell the machine once the size settles, not on every pixel
+    clearTimeout(shResizeTimer);
+    const id=shell.id;
+    shResizeTimer=setTimeout(()=>{if(shell.id===id&&!shell.closed)api('POST',`/shells/${id}/resize`,{cols:t.cols,rows:t.rows}).catch(()=>{})},150);
+  }
 }
-async function openShell(name){
-  const m=machInfo(name); shell.name=name;
-  $('#shHead').textContent=`Shell on ${name}`;
-  $('#shDest').textContent=m?`${m.user?m.user+'@':''}${m.host}${m.port?':'+m.port:''} · ${m.workdir||'~'}`:'';
-  shellDlg.showModal();
+// att: {run, session} attaches to a run's screen session instead of opening a login shell
+async function openShell(name,att){
+  const m=machInfo(name); shell.name=name; shell.att=att||null;
+  $('#shHead').textContent=att?`Run #${att.run} on ${name}`:`Shell on ${name}`;
+  const dest=m?`${m.user?m.user+'@':''}${m.host}${m.port?':'+m.port:''}`:name;
+  $('#shDest').textContent=att?`${dest} · screen session ${att.session}`:m?`${dest} · ${m.workdir||'~'}`:'';
+  $('#shHint').innerHTML=att?'<b>Detach: Ctrl+A, then D</b> (the run keeps going) · Ctrl+C interrupts pytest · select text to copy · Ctrl+V or Shift+Insert pastes'
+    :SH_HINT;
+  shellDlg.showModal(); restoreBox(shellDlg);
   const t=shellTerm(); t.reset();
   await new Promise(r=>requestAnimationFrame(r));
   const {cols,rows}=t.fit(); t.resize(cols,rows);
@@ -1874,9 +2123,10 @@ async function openShell(name){
 async function startShell(){
   const t=shell.term, gen=++shell.gen;
   shell.id=null; shell.off=0; shell.q=''; shell.closed=false; shellState('connecting');
-  t.write(`\x1b[2m[pytest-board] ssh ${$('#shDest').textContent.split(' · ')[0]} …\x1b[0m\r\n`); t.el.focus();
+  t.write(`\x1b[2m[pytest-board] ssh ${$('#shDest').textContent.split(' · ')[0]}${shell.att?' · screen -x '+shell.att.session:''} …\x1b[0m\r\n`); t.el.focus();
   try{
-    const d=await api('POST',`/machines/${encodeURIComponent(shell.name)}/shell`,{cols:t.cols,rows:t.rows});
+    const d=shell.att?await api('POST',`/runs/${shell.att.run}/attach`,{cols:t.cols,rows:t.rows})
+      :await api('POST',`/machines/${encodeURIComponent(shell.name)}/shell`,{cols:t.cols,rows:t.rows});
     if(gen!==shell.gen){api('DELETE',`/shells/${d.id}`).catch(()=>{});return}
     shell.id=d.id; shellState('open'); pollShell(d.id,gen);
   }catch(e){
@@ -1897,7 +2147,7 @@ async function pollShell(id,gen){
     shell.off=d.offset;
     if(d.closed){
       shell.closed=true;
-      shell.term.write(`\r\n\x1b[2m[pytest-board] connection closed${d.exit_code?` (exit code ${d.exit_code}${d.exit_code===255?': ssh could not connect or log in':''})`:''}. Reconnect opens a new shell.\x1b[0m\r\n`);
+      shell.term.write(`\r\n\x1b[2m[pytest-board] connection closed${d.exit_code?` (exit code ${d.exit_code}${d.exit_code===255?': ssh could not connect or log in':''})`:''}. ${shell.att?'Reconnect attaches again while the run goes on.':'Reconnect opens a new shell.'}\x1b[0m\r\n`);
       shellState('closed',d.exit_code); return;
     }
   }
@@ -1913,6 +2163,7 @@ shellDlg.addEventListener('cancel',e=>e.preventDefault());  // Esc belongs to th
 shellDlg.addEventListener('close',()=>{
   endShell();
   const name=shell.name; if(!name) return;
+  if(shell.att){if(cardDlg.open)loadCard(false);return}  // detached from a run: it goes on
   // re-test the machine: the folder or venv may exist now
   if(machDlg.open&&md.name===name) statusBox({state:'checking'});
   api('POST',`/machines/${encodeURIComponent(name)}/check`).then(st=>{if(machDlg.open&&md.name===name)statusBox(st);refresh(true)}).catch(()=>{});
@@ -1944,7 +2195,7 @@ $('#grpFilter').onchange=e=>{grpSel=e.target.value;render()};
 
 refresh(true);
 setInterval(()=>refresh(),1500);
-setInterval(()=>{if(!dragging&&!editingLane()&&!document.hidden)render()},30000); // keep "x ago" labels fresh
+setInterval(()=>{if(!dragging&&!document.hidden)render()},30000); // keep "x ago" labels fresh
 </script>
 </body>
 </html>
