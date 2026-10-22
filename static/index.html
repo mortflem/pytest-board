@@ -127,6 +127,9 @@ aside.min.over{background:var(--accent-soft)}
 .mpill svg{width:11px;height:11px;flex:none}
 .mpill.inherit{background:transparent;border:1px dashed color-mix(in srgb,var(--mach) 45%,transparent)}
 .mpill.missing{color:var(--failed);background:var(--failed-soft)}
+.bpill{display:inline-flex;align-items:center;gap:3px;font:600 10.5px/1 var(--mono);color:var(--muted);background:color-mix(in srgb,var(--muted) 12%,transparent);border-radius:3px;padding:3px 5px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.bpill svg{width:11px;height:11px;flex:none}
+.bpill.inherit{background:transparent;border:1px dashed var(--border-strong)}
 body.machine-drag .card,body.machine-drag .lib-item{outline:1px dashed var(--mach);outline-offset:1px}
 .mdrop{outline:2px solid var(--mach)!important;background:color-mix(in srgb,var(--mach) 10%,var(--surface))!important}
 #machDlg{width:640px}
@@ -236,6 +239,8 @@ body.is-dragging .cell.blocked{opacity:.45}
 .pill.run{background:var(--running-soft);color:var(--running)}
 .pill.sch{background:var(--scheduled-soft);color:var(--scheduled)}
 .pill.q{background:var(--queued-soft);color:var(--queued)}
+.pill.warn{background:var(--queued-soft);color:var(--queued);font-weight:600}
+.mini-meta .warn{color:var(--queued);display:inline-flex;align-items:center;gap:2px}
 .progress{position:absolute;left:0;right:0;bottom:0;height:2px;overflow:hidden;border-radius:0 0 6px 6px}
 .progress::after{content:"";position:absolute;inset:0;width:40%;background:var(--running);animation:slide 1.2s ease-in-out infinite}
 @keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
@@ -266,7 +271,21 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
 .preview.err{color:var(--failed)}
 .cmd{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;word-break:break-all;color:var(--muted)}
 
-#cardDlg{width:1100px;height:min(760px,calc(100vh - 40px))}
+#cardDlg{width:1100px;height:min(760px,calc(100vh - 40px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:hidden}
+/* movable, resizable dialogs: drag the title bar to move, an edge or a corner to resize */
+.rz{position:absolute;z-index:5;touch-action:none}
+.rz.n,.rz.s{left:10px;right:10px;height:6px;cursor:ns-resize}.rz.n{top:0}.rz.s{bottom:0}
+.rz.e,.rz.w{top:10px;bottom:10px;width:6px;cursor:ew-resize}.rz.e{right:0}.rz.w{left:0}
+.rz.ne,.rz.nw,.rz.se,.rz.sw{width:14px;height:14px}
+.rz.ne{top:0;right:0;cursor:nesw-resize}.rz.sw{bottom:0;left:0;cursor:nesw-resize}
+.rz.nw{top:0;left:0;cursor:nwse-resize}.rz.se{bottom:0;right:0;cursor:nwse-resize}
+.rz.se::after{content:"";position:absolute;right:3px;bottom:3px;width:8px;height:8px;opacity:.55;
+  background:linear-gradient(135deg,transparent 45%,var(--muted) 45%,var(--muted) 55%,transparent 55%,transparent 70%,var(--muted) 70%,var(--muted) 80%,transparent 80%)}
+.rz.se:hover::after{opacity:1}
+body.resizing{user-select:none;-webkit-user-select:none}
+.dlg-head.drag-handle{cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+.dlg-head.drag-handle button{cursor:pointer}
+body.resizing *{cursor:inherit!important}
 #cardDlg[open]{display:flex;flex-direction:column}
 .card-grid{display:grid;grid-template-columns:340px 1fr;flex:1;min-height:0}
 .card-grid>div{overflow:auto}
@@ -286,7 +305,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
 
 #discDlg{width:760px}
 #helpDlg{width:820px}
-#shellDlg{width:min(1100px,calc(100vw - 32px))}
+#shellDlg{width:min(1100px,calc(100vw - 32px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:hidden}
 #shellDlg[open]{display:flex;flex-direction:column;height:min(720px,calc(100vh - 40px))}
 #shTerm{flex:1;min-height:0}
 .sh-dest{font:12px var(--mono);color:var(--muted)}
@@ -421,6 +440,8 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
         <div class="field"><label for="fTimeout">Timeout (s)</label><input id="fTimeout" type="number" min="0" placeholder="none"></div>
         <div class="field" id="fOptWrap" style="flex:2"><label for="fOpt">Option set</label><input id="fOpt" class="mono" placeholder="none, e.g. -m smoke -x" autocomplete="off"></div>
       </div>
+      <div class="field"><label for="fBranch">Git branch</label><input id="fBranch" class="mono" placeholder="none: the project folder as it is" autocomplete="off" spellcheck="false">
+        <small id="fBranchInfo"></small></div>
       <div class="field" id="cdSchedWrap"><label>Schedule</label><div id="cdSched" class="preview"></div></div>
       <div class="field"><label>Command</label><div class="cmd mono" id="cdCmd">—</div></div>
     </div>
@@ -436,6 +457,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <button class="btn" id="cdSaveLib" style="margin-right:auto" title="Add a copy of this card's settings to the test library">Save to library</button>
     <span id="cdFootSpacer" style="margin-right:auto"></span>
     <button class="btn" id="cdSchedule">Schedule…</button>
+    <button class="btn" id="cdAttach" hidden>Attach</button>
     <button class="btn" id="cdStop">Stop</button>
     <button class="btn" id="cdRun">Run now</button>
     <button class="btn primary" id="cdSave">Save</button>
@@ -468,6 +490,12 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
       <small>e.g. <span class="mono">.venv/bin/python -m pytest</span> (relative to the project folder)</small></div>
     <div class="field"><label for="mEnv">Environment on this machine</label><textarea id="mEnv" class="mono" rows="2" placeholder="DISPLAY=:99"></textarea>
       <small>Headline and test env override these.</small></div>
+    <div class="row">
+      <div class="field"><label for="mEnvFile">Env file on this server</label><input id="mEnvFile" class="mono" placeholder="(none) e.g. lab.env" autocomplete="off">
+        <small id="mEnvFileInfo">Lines like <span class="mono">export NAME=value</span>, sent with every run on this machine. Relative to the config file's folder.</small></div>
+      <div class="field"><label for="mRemoteEnv">Env file on the machine</label><input id="mRemoteEnv" class="mono" placeholder=".env" autocomplete="off">
+        <small>Loaded there before each run, if it exists. Relative to the project folder; <span class="mono">none</span> turns it off.</small></div>
+    </div>
     <div class="field"><label for="mSshOpts">Extra ssh options</label><input id="mSshOpts" class="mono" placeholder="-o ProxyJump=bastion" autocomplete="off"></div>
     <div class="field"><label for="mNotes">Notes</label><input id="mNotes" placeholder="GPU box, Ubuntu 24.04" autocomplete="off"></div>
     <div class="field"><label>Connection</label><div class="mstat" id="mdStatus"><span class="sdot"></span><span>Not checked yet.</span></div></div>
@@ -517,7 +545,7 @@ dialog::backdrop{background:rgba(9,30,66,.45)}
     <span class="sh-dest" id="shDest"></span><span class="sh-state" id="shState"></span><span class="spacer"></span>
     <button class="icon" id="shX" title="Close the shell"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div id="shTerm"></div>
-  <div class="dlg-foot"><span style="margin-right:auto;color:var(--faint);font-size:12px">Runs as the board's ssh user. Select text to copy · Ctrl+V pastes · Shift+PgUp/PgDn scrolls · type <span class="mono">exit</span> to log out.</span>
+  <div class="dlg-foot"><span id="shHint" style="margin-right:auto;color:var(--faint);font-size:12px">Runs as the board's ssh user. Select text to copy · Ctrl+V pastes · Shift+PgUp/PgDn scrolls · type <span class="mono">exit</span> to log out.</span>
     <button class="btn" id="shReconnect" hidden>Reconnect</button><button class="btn primary" id="shClose" style="background:var(--mach);border-color:var(--mach)">Close</button></div>
 </dialog>
 
@@ -554,6 +582,8 @@ const I={
   copy:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>',
   server:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.75h.01M4.5 11.25h.01" stroke-width="2.2" stroke-linecap="round"/></svg>',
   opts:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h7M13 4h1M2 8h2M8 8h6M2 12h9M14 12h0"/><circle cx="11" cy="4" r="1.6"/><circle cx="6" cy="8" r="1.6"/><circle cx="12.5" cy="12" r="1.6"/></svg>',
+  branch:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4.5" cy="3.5" r="1.6"/><circle cx="4.5" cy="12.5" r="1.6"/><circle cx="11.5" cy="5.5" r="1.6"/><path d="M4.5 5.1v5.8M11.5 7.1c0 2.4-2.5 2.9-6.2 4"/></svg>',
+  nolink:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 6.5a9.5 9.5 0 0 1 13 0M4 9.2a6 6 0 0 1 8 0M6.4 11.8a2.5 2.5 0 0 1 3.2 0M2.5 2.5l11 11"/></svg>',
   hourglass:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2h8M4 14h8M5 2c0 4 6 4 6 6s-6 2-6 6M11 2c0 4-6 4-6 6"/></svg>',
 };
 
@@ -601,6 +631,7 @@ function fmtTime(ts){
 function ago(ts){const s=Math.max(0,(now()/1000-ts)|0);if(s<60)return s+'s ago';if(s<3600)return (s/60|0)+'m ago';if(s<86400)return (s/3600|0)+'h ago';return (s/86400|0)+'d ago'}
 function dur(sec){sec=Math.max(0,sec|0);const m=sec/60|0,s=sec%60;return m>=60?`${m/60|0}h${String(m%60).padStart(2,'0')}m`:`${m}:${String(s).padStart(2,'0')}`}
 const OUTCOME_LABEL={timeout:'timed out','no-tests':'no tests collected',interrupted:'interrupted',unreachable:'machine unreachable',
+  lost:'run lost','start-failed':'could not start','checkout-failed':'git checkout failed',
   'no-workdir':'remote folder missing','sync-failed':'sync failed','no-machine':'machine not defined','not-found':'pytest not found',error:'error','usage-error':'pytest usage error'};
 function resultPill(o){
   if(!o.last_outcome||o.last_outcome==='running') return '';
@@ -782,8 +813,11 @@ function askOptsets(test,lane,status,prefill,always){
 // compact card for side-by-side option-set groups: title + one status line, details in the tooltip
 function miniCardHtml(c,idx){
   let st='';
-  if(c.status==='queued') st=`${I.hourglass}${idx===0?'next':'#'+(idx+1)}`;
-  else if(c.status==='running') st=`${I.spin}<span class="elapsed" data-since="${c.last_started||c.updated}"></span>`;
+  const wait=waitingFor(c);
+  if(wait) st=`<span class="warn">${I.nolink}waiting</span>`;
+  else if(c.branch_wait) st=`${I.branch}after ${esc(c.branch_wait)}`;
+  else if(c.status==='queued') st=`${I.hourglass}${idx===0?'next':'#'+(idx+1)}`;
+  else if(c.status==='running') st=`${I.spin}<span class="elapsed" data-since="${c.last_started||c.updated}"></span>${c.link?`<span class="warn" style="margin-left:4px">${I.nolink}</span>`:''}`;
   else if(c.status==='scheduled') st=c.cron?`${I.repeat}cron`:c.run_at?`${I.clock}${new Date(c.run_at*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`:'';
   if(c.status!=='running'&&c.status!=='queued'&&c.last_outcome&&c.last_outcome!=='running'){
     const bad=(c.last_failed||0)+(c.last_errors||0);
@@ -792,7 +826,9 @@ function miniCardHtml(c,idx){
   }
   const res=c.last_outcome&&c.last_outcome!=='running'?(c.last_outcome==='passed'?`passed (${c.last_passed??0})`:OUTCOME_LABEL[c.last_outcome]||c.last_outcome):'';
   const tip=[c.title,(c.target||'(whole suite)')+(c.args?' '+c.args:''),c.grp&&'headline '+c.grp,c.optset&&'options: '+c.optset,
-    COLS.find(x=>x.key===c.status)?.label+(c.cron?' · cron '+c.cron:''),res&&'last run: '+res].filter(Boolean).join('\n');
+    resolveBranch(c).name&&'git branch: '+resolveBranch(c).name,
+    COLS.find(x=>x.key===c.status)?.label+(c.cron?' · cron '+c.cron:''),wait&&waitTip(wait),c.branch_wait&&branchWaitTip(c),c.status==='running'&&c.link&&linkTip(c,resolveMachine(c).name),
+    res&&'last run: '+res].filter(Boolean).join('\n');
   return {html:`<div class="mini-title">${esc(c.title)}</div>${st?`<div class="mini-meta">${st}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`,tip};
 }
 function cardEl(c,idx,mini){
@@ -809,7 +845,11 @@ function cardEl(c,idx,mini){
   }
   let meta='';
   if(c.status==='running') meta+=`<span class="pill run">${I.spin}running <span class="elapsed" data-since="${c.last_started||c.updated}"></span></span>`;
-  if(c.status==='queued') meta+=`<span class="pill q">${I.hourglass}${idx===0?'next up':'#'+(idx+1)+' in queue'}</span>`;
+  if(c.status==='running'&&c.link) meta+=`<span class="pill warn" title="${esc(linkTip(c,resolveMachine(c).name))}">${I.nolink}reconnecting</span>`;
+  const wait=waitingFor(c);
+  if(wait) meta+=`<span class="pill warn" title="${esc(waitTip(wait))}">${I.nolink}waiting for ${esc(wait.name)}</span>`;
+  else if(c.branch_wait) meta+=`<span class="pill q" title="${esc(branchWaitTip(c))}">${I.branch}after ${esc(c.branch_wait)}</span>`;
+  else if(c.status==='queued') meta+=`<span class="pill q">${I.hourglass}${idx===0?'next up':'#'+(idx+1)+' in queue'}</span>`;
   if(c.cron) meta+=`<span class="pill sch" title="cron: ${esc(c.cron)}">${I.repeat}<span class="mono">${esc(c.cron)}</span></span>`;
   if(c.run_at&&c.status==='scheduled') meta+=`<span class="pill sch" title="${new Date(c.run_at*1000).toLocaleString()}">${I.clock}${fmtTime(c.run_at)}</span>`;
   meta+=resultPill(c);
@@ -821,7 +861,8 @@ function cardEl(c,idx,mini){
     <div class="target mono">${esc(c.target||'(whole suite)')}${c.args?' <span style="color:var(--faint)">'+esc(c.args)+'</span>':''}</div>
     ${meta?`<div class="meta">${meta}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`;
   const libCopy=c.test_id&&S.tests.some(t=>t.id===c.test_id), mp='';  // the swimlane shows the machine
-  if(c.grp||libCopy||mp) el.insertAdjacentHTML('afterbegin',`<div class="card-tags">${grpTag(c.grp)}${mp}${libCopy?`<span class="from" title="Copied from the test library">${I.copy}library copy</span>`:''}</div>`);
+  const bp=branchPill(c);
+  if(c.grp||libCopy||mp||bp) el.insertAdjacentHTML('afterbegin',`<div class="card-tags">${grpTag(c.grp)}${mp}${bp}${libCopy?`<span class="from" title="Copied from the test library">${I.copy}library copy</span>`:''}</div>`);
   el.onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
     if(a==='run'){e.stopPropagation();api('POST',`/cards/${c.id}/run`).then(()=>refresh(true)).catch(fail);return}
@@ -867,6 +908,26 @@ function resolveMachine(it){
   return {name:'local',src:'default'};
 }
 const machLabel=n=>n==='local'?'this server':n;
+// git branch a card/test runs on: its own, else its headline's (null: the project folder as it is)
+function resolveBranch(it){
+  if(it.branch) return {name:it.branch,src:'card'};
+  const g=grpInfo(it.grp); if(g?.branch) return {name:g.branch,src:'headline'};
+  return {name:null,src:'default'};
+}
+function branchPill(it){
+  const b=resolveBranch(it); if(!b.name) return '';
+  return `<span class="bpill${b.src==='headline'?' inherit':''}" title="Checks out ${esc(b.name)} (after git fetch) before pytest starts${b.src==='headline'?' · from headline '+esc(it.grp):''}">${I.branch}${esc(b.name)}</span>`;
+}
+// a queued card whose machine can't be reached waits for it (it starts once a health check gets through again)
+function waitingFor(c){
+  if(c.status!=='queued') return null;
+  const n=resolveMachine(c).name, st=n!=='local'&&machInfo(n)?.status;
+  return st&&st.state==='offline'?{name:n,detail:st.detail||''}:null;
+}
+const hhmm=ts=>new Date(ts*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const linkTip=(c,n)=>`No connection to ${n} since ${hhmm(c.link.since)}${c.link.detail?' ('+c.link.detail+')':''}. The run goes on there by itself; the board reconnects and catches up on the output.`;
+const branchWaitTip=c=>`Runs on ${machLabel(resolveMachine(c).name)} switch its project folder, so the runs going on there at the same time all use one branch. This card (${resolveBranch(c).name||'no branch: the folder as it is'}) starts when the runs on ${c.branch_wait} are done.`;
+const waitTip=w=>`${w.name} can't be reached${w.detail?' ('+w.detail+')':''}. The card waits here and starts as soon as ${w.name} answers again.`;
 function machPill(it,{always=false}={}){
   const r=resolveMachine(it);
   if(r.name==='local'&&!always&&it.machine!=='local') return '';
@@ -951,9 +1012,12 @@ function renderLibrary(){
   const f=($('#libSearch').value||'').trim().toLowerCase();
   $('#libCount').textContent=(S.tests||[]).length;
   const cfg=S.groups_config||{}, lc=$('#libCfg');
-  lc.className='lib-cfg'+(cfg.error?' err':'');
-  lc.innerHTML=cfg.error?`Config problem: ${esc(cfg.error)}`:cfg.exists?`Headlines from <span class="mono">${esc(cfg.path)}</span>`
-    :cfg.path?`No <span class="mono">${esc(cfg.path.split('/').pop())}</span> found, so there are no headlines yet (see README).`:'';
+  const ef=cfg.env_file, envErr=[ef?.error,...(S.groups||[]).map(g=>g.env_file&&(g.env_file.error||(!g.env_file.exists&&`[${g.key}] env_file not found: ${g.env_file.path}`)))].filter(Boolean);
+  lc.className='lib-cfg'+(cfg.error||envErr.length?' err':'');
+  lc.innerHTML=(cfg.error?`Config problem: ${esc(cfg.error)}`:cfg.exists?`Headlines from <span class="mono">${esc(cfg.path)}</span>`
+    :cfg.path?`No <span class="mono">${esc(cfg.path.split('/').pop())}</span> found, so there are no headlines yet (see README).`:'')
+    +(ef?.exists?`<br>Every run gets ${ef.keys.length} variable${ef.keys.length===1?'':'s'} from <span class="mono" title="${esc(ef.keys.join(', '))}">${esc(ef.path)}</span>`:'')
+    +envErr.map(e=>`<br>Env file problem: ${esc(e)}`).join('');
   const list=$('#libList'); list.innerHTML='';
   let shown=0;
   for(const sec of librarySections()){
@@ -967,7 +1031,8 @@ function renderLibrary(){
     box.className='lib-group'+(collapsedGrps.has(k)&&!f?' collapsed':''); box.dataset.grp=k;
     box.style.setProperty('--g',g?.color||'var(--faint)');
     const sub=g?[g.title&&esc(g.title),g.machine&&`<span style="color:var(--mach)">on ${esc(g.machine)}</span>`,g.dir&&`<span class="mono">${esc(g.dir)}/</span>`,g.args&&`<span class="mono">${esc(g.args)}</span>`,
-        g.env_keys.length&&`env: ${g.env_keys.map(esc).join(', ')}`].filter(Boolean).join(' · ')
+        g.env_keys.length&&`env: ${g.env_keys.map(esc).join(', ')}`,
+        g.env_file&&`<span class="mono" title="${esc(g.env_file.path)}${g.env_file.exists?': '+esc(g.env_file.keys.join(', ')):' (not found)'}">${esc(g.env_file.path.split('/').pop())}</span>${g.env_file.exists?'':' <span class="warn">not found</span>'}`].filter(Boolean).join(' · ')
       :k?`<span class="warn">Not in the config file.</span> Add a [${esc(k)}] section or move these tests.`:'Tests without a headline';
     box.innerHTML=`<div class="grp-head">
         <button class="icon" data-act="toggle" title="Collapse">${I.caret}</button><span class="gdot"></span>
@@ -1024,6 +1089,7 @@ function libItem(t,g){
     el.innerHTML=`<div class="card-top"><span class="card-title">${esc(t.name)}</span>
         <button class="icon quick" data-act="del" title="Delete from library">${I.trash}</button></div>
       <div class="target mono" style="color:var(--muted);word-break:break-all;margin-top:2px">${esc(t.target||'(whole suite)')}${t.args?' <span style="color:var(--faint)">'+esc(t.args)+'</span>':''}</div>
+      ${branchPill(t)?`<div style="margin-top:4px">${branchPill(t)}</div>`:''}
       <div class="lib-mrow" title="Machine this test's copies run on">${I.server}<select class="lib-mach" aria-label="Machine for ${esc(t.name)}"></select></div>
       ${meta?`<div class="meta">${meta}</div>`:''}`;
     wireLibMachine(el,t);
@@ -1164,14 +1230,90 @@ function askSchedule(card){
   });
 }
 
+/* ---------------- movable, resizable dialogs */
+// Drag the title bar to move, an edge or a corner to resize. Size and position are remembered in this browser (a
+// per-viewer convenience). Double-click the title bar to center the window, an edge or the grip for the default size.
+const RZ_MIN={w:640,h:420}, RZ_M=8;  // smallest size; gap kept to the browser window's edges
+const boxKey=(dlg,k)=>`pb.${k}.${dlg.id}`;
+function boxLoad(dlg,k){try{return JSON.parse(localStorage.getItem(boxKey(dlg,k))||'null')}catch(e){return null}}
+function boxSave(dlg,k,v){try{v?localStorage.setItem(boxKey(dlg,k),JSON.stringify(v)):localStorage.removeItem(boxKey(dlg,k))}catch(e){}}
+function pinBox(dlg,left,top,w,h){Object.assign(dlg.style,{margin:'0',inset:'auto',left:left+'px',top:top+'px',width:w+'px',height:h+'px'})}
+function centerBox(dlg){Object.assign(dlg.style,{margin:'',inset:'',left:'',top:''})}
+function fitBox(dlg){  // a pinned window stays inside the browser window (after it got smaller, say)
+  if(!dlg.open||dlg.style.left==='') return;
+  const r=dlg.getBoundingClientRect(), W=innerWidth, H=innerHeight;
+  const w=Math.min(r.width,W-2*RZ_M), h=Math.min(r.height,H-2*RZ_M);
+  pinBox(dlg,Math.max(RZ_M,Math.min(r.left,W-w-RZ_M)),Math.max(RZ_M,Math.min(r.top,H-h-RZ_M)),w,h);
+}
+function restoreBox(dlg){  // call right after showModal(): the remembered size and place, or the default, centered
+  centerBox(dlg); Object.assign(dlg.style,{width:'',height:''});
+  const sz=boxLoad(dlg,'size'), pos=boxLoad(dlg,'pos');
+  if(sz?.w&&sz?.h) Object.assign(dlg.style,{width:Math.min(sz.w,innerWidth-2*RZ_M)+'px',height:Math.min(sz.h,innerHeight-2*RZ_M)+'px'});
+  if(pos&&Number.isFinite(pos.x)&&Number.isFinite(pos.y)){
+    const r=dlg.getBoundingClientRect(); pinBox(dlg,pos.x,pos.y,r.width,r.height); fitBox(dlg);
+  }
+}
+const allBoxes=[];
+addEventListener('resize',()=>allBoxes.forEach(fitBox));
+function makeWindow(dlg){
+  allBoxes.push(dlg);
+  for(const d of ['n','s','e','w','ne','nw','se','sw']){
+    const h=document.createElement('div'); h.className='rz '+d; h.dataset.dir=d;
+    h.title=d==='se'?'Drag to resize · double-click for the default size':''; dlg.append(h);
+  }
+  const head=dlg.querySelector('.dlg-head'); head.classList.add('drag-handle');
+  head.title='Drag to move · double-click to center';
+  let st=null;
+  const busy=cursor=>{document.body.classList.add('resizing');document.body.style.cursor=cursor};
+  dlg.addEventListener('pointerdown',e=>{
+    if(e.button!==0) return;
+    const h=e.target.closest?.('.rz'), onHead=!h&&e.target.closest?.('.dlg-head')===head&&!e.target.closest('button,a,input,select,textarea,label');
+    if(!h&&!onHead) return;
+    e.preventDefault(); const r=dlg.getBoundingClientRect();
+    st={dir:h?h.dataset.dir:'move',x:e.clientX,y:e.clientY,r}; (h||head).setPointerCapture(e.pointerId);
+    // pin the window where it is: the dragged edge (or the whole window) follows the pointer
+    pinBox(dlg,r.left,r.top,r.width,r.height);
+    busy(h?getComputedStyle(h).cursor:'move');
+  });
+  dlg.addEventListener('pointermove',e=>{
+    if(!st) return;
+    const {dir,x,y,r}=st, m=RZ_M, W=innerWidth, H=innerHeight, dx=e.clientX-x, dy=e.clientY-y;
+    if(dir==='move'){
+      pinBox(dlg,Math.max(m,Math.min(r.left+dx,W-r.width-m)),Math.max(m,Math.min(r.top+dy,H-r.height-m)),r.width,r.height);
+      return;
+    }
+    const minW=Math.min(RZ_MIN.w,W-2*m), minH=Math.min(RZ_MIN.h,H-2*m);
+    let {left,top,right,bottom}=r;
+    if(dir.includes('e')) right=Math.min(W-m,Math.max(left+minW,r.right+dx));
+    if(dir.includes('w')) left=Math.max(m,Math.min(right-minW,r.left+dx));
+    if(dir.includes('s')) bottom=Math.min(H-m,Math.max(top+minH,r.bottom+dy));
+    if(dir.includes('n')) top=Math.max(m,Math.min(bottom-minH,r.top+dy));
+    pinBox(dlg,left,top,right-left,bottom-top);
+  });
+  const end=()=>{
+    if(!st) return;
+    const moved=st.dir==='move'; st=null;
+    document.body.classList.remove('resizing'); document.body.style.cursor='';
+    const r=dlg.getBoundingClientRect();
+    boxSave(dlg,'pos',{x:Math.round(r.left),y:Math.round(r.top)});
+    if(!moved) boxSave(dlg,'size',{w:Math.round(r.width),h:Math.round(r.height)});
+  };
+  dlg.addEventListener('pointerup',end); dlg.addEventListener('pointercancel',end);
+  dlg.addEventListener('dblclick',e=>{
+    if(e.target.closest?.('.rz')){boxSave(dlg,'size',null);boxSave(dlg,'pos',null);restoreBox(dlg);return}  // default size, centered
+    if(e.target.closest?.('.dlg-head')===head&&!e.target.closest('button,a,input,select,textarea')){boxSave(dlg,'pos',null);centerBox(dlg)}
+  });
+}
+
 /* ---------------- card dialog */
 const cardDlg=$('#cardDlg');
+makeWindow(cardDlg);
 let cd={id:null,data:null,runId:null,offset:0,timer:null};
 // kind: 'card' (a copy on the board) or 'test' (a library test). id==null -> create a new library test.
 async function openCard(id,laneId,kind='card',grp){
   cd={kind,id,data:null,runId:null,offset:0,timer:null};
   const isTest=kind==='test', isNew=id==null;
-  for(const f of ['fTitle','fTarget','fArgs','fEnv','fTimeout','fOpt']) $('#'+f).value='';
+  for(const f of ['fTitle','fTarget','fArgs','fEnv','fTimeout','fOpt','fBranch']) $('#'+f).value='';
   const defGrp=grp!==undefined?grp:(grpSel!=='*'?grpSel:(S.groups||[])[0]?.key);
   groupOptions($('#fGroup'),defGrp??''); groupInfo(); machineOptions('');
   $('#cdRuns').innerHTML=''; $('#cdLog').innerHTML=''; $('#cdCmd').textContent='—';
@@ -1180,12 +1322,13 @@ async function openCard(id,laneId,kind='card',grp){
   $('#lblTitle').textContent=isTest?'Name':'Title';
   $('#fOptWrap').hidden=isTest;  // library tests get their option sets when they're put on the board
   ['cdDelete','cdSchedule','cdStop','cdRun'].forEach(b=>$('#'+b).hidden=isNew);
+  $('#cdAttach').hidden=true;
   $('#cdSaveLib').hidden=true; $('#cdFootSpacer').hidden=!isNew;
   $('#cdSchedWrap').hidden=isNew;
   $('#cdLog').innerHTML=`<div class="nolog" style="padding:40px;text-align:center;color:var(--faint)">${isNew?'Once saved, drag the test from the library onto the board to run a copy of it.':'Loading…'}</div>`;
   $('#junitLink').hidden=true;
   $('#cdSave').textContent=isNew?'Add to library':'Save';
-  cardDlg.showModal();
+  cardDlg.showModal(); restoreBox(cardDlg);
   if(isNew){$('#fTarget').focus();return}
   await loadCard(true);
 }
@@ -1196,11 +1339,12 @@ async function loadCard(fill){
   cd.data=c;
   if(fill){
     $('#fTitle').value=isTest?c.name:c.title; $('#fTarget').value=c.target; $('#fArgs').value=c.args; $('#fEnv').value=c.env;
-    $('#fTimeout').value=c.timeout||''; $('#fOpt').value=c.optset??'';
+    $('#fTimeout').value=c.timeout||''; $('#fOpt').value=c.optset??''; $('#fBranch').value=c.branch||'';
     groupOptions($('#fGroup'),c.grp||''); groupInfo(); machineOptions(c.machine||'');
   }
-  $('#cdCmd').textContent=c.run_machine==='local'?`cd ${c.cwd}\n${c.command_preview}`
-    :c.machine_missing?c.command_preview:`ssh ${c.ssh}  (${c.run_machine})\ncd ${c.cwd.split(':').pop()}\n${c.command_preview}`;
+  const co=c.run_branch?`git fetch && git checkout ${c.run_branch}   (in the project folder${c.run_branch_source==='headline'?', branch from the headline':''})\n`:'';
+  $('#cdCmd').textContent=c.run_machine==='local'?`${co}cd ${c.cwd}\n${c.command_preview}`
+    :c.machine_missing?c.command_preview:`ssh ${c.ssh}  (${c.run_machine})\n${co}cd ${c.cwd.split(':').pop()}\n${c.command_preview}`;
   $('#cdCmd').style.whiteSpace='pre-wrap';
   if(isTest){
     $('#cdHead').textContent=c.name;
@@ -1215,6 +1359,11 @@ async function loadCard(fill){
     $('#cdStop').hidden=!['running','queued'].includes(c.status);
     $('#cdStop').textContent=c.status==='queued'?'Unqueue':'Stop';
     $('#cdRun').hidden=['running','queued'].includes(c.status);
+    // a run on a machine goes on in a screen session there: Attach opens a terminal in it
+    const live=c.status==='running'&&c.runs[0]?.outcome==='running'&&c.runs[0].detached?c.runs[0]:null, at=$('#cdAttach');
+    at.hidden=!live; at.disabled=!live?.session; cd.attach=live?.session?{run:live.id,session:live.session,machine:live.machine}:null;
+    at.title=!live?'':live.session?`Open a terminal in this run's screen session on ${live.machine}: watch it live, answer a debugger. Detach with Ctrl+A then D; the run keeps going.`
+      :`screen isn't installed on ${live.machine}, so this run has no session to attach to. Install it there (e.g. sudo apt install screen); later runs get one.`;
     $('#cdSaveLib').hidden=!!c.test_name; $('#cdFootSpacer').hidden=!c.test_name;
     $('#cdSchedWrap').querySelector('label').textContent='Schedule';
     const col=COLS.find(x=>x.key===c.status)?.label;
@@ -1222,15 +1371,15 @@ async function loadCard(fill){
       `Column: <b>${col}</b>. `+(c.cron?`Repeats <span class="mono">${esc(c.cron)}</span>${c.next_fires?' — next '+c.next_fires.map(t=>esc(fmtTime(t))).join(', '):''}.`
       :c.run_at?`Runs once ${esc(fmtTime(c.run_at))}.`:'Not scheduled — drag to Scheduled or use “Schedule…”.');
   }
-  const hasOpts=c.runs.some(r=>r.optset);
+  const hasOpts=c.runs.some(r=>r.optset), hasBr=c.runs.some(r=>r.branch);
   const rows=c.runs.map(r=>{
     const bad=(r.failed||0)+(r.errors||0);
-    const res=r.outcome==='running'?`<span class="pill run">${I.spin}running</span>`:r.outcome==='passed'?`<span class="pill ok">${I.check}passed</span>`:
+    const res=r.outcome==='running'?`<span class="pill run">${I.spin}running</span>${c.link&&r.id===c.last_run_id?` <span class="pill warn" title="${esc(linkTip(c,r.machine))}">${I.nolink}reconnecting</span>`:''}`:r.outcome==='passed'?`<span class="pill ok">${I.check}passed</span>`:
       r.outcome!=='cancelled'?`<span class="pill bad">${I.x}${esc(OUTCOME_LABEL[r.outcome]||r.outcome)}</span>`:`<span class="pill">${esc(r.outcome)}</span>`;
     return `<tr data-run="${r.id}" class="${r.id===cd.runId?'sel':''}"><td>#${r.id}</td><td>${res}</td>
       <td>${r.total!=null?`${r.passed} ✓ ${bad?'· '+bad+' ✗':''} ${r.skipped?'· '+r.skipped+' skip':''}`:'—'}</td>
-      <td>${esc(fmtTime(r.started))}</td><td>${r.finished?dur(r.finished-r.started):'…'}</td>${hasOpts?`<td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.optset||'')}">${esc(r.optset||'')}</td>`:''}<td>${esc(machLabel(r.machine||'local'))}</td><td style="color:var(--faint)">${esc(r.trigger||'')}</td></tr>`}).join('');
-  $('#cdRuns').innerHTML=c.runs.length?`<table><thead><tr><th>Run</th><th>Result</th><th>Tests</th><th>Started</th><th>Took</th>${hasOpts?'<th>Options</th>':''}<th>Machine</th><th>Trigger</th></tr></thead><tbody>${rows}</tbody></table>`
+      <td>${esc(fmtTime(r.started))}</td><td>${r.finished?dur(r.finished-r.started):'…'}</td>${hasBr?`<td class="mono" style="max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.branch||'')}">${esc(r.branch||'')}</td>`:''}${hasOpts?`<td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${esc(r.optset||'')}">${esc(r.optset||'')}</td>`:''}<td>${esc(machLabel(r.machine||'local'))}</td><td style="color:var(--faint)">${esc(r.trigger||'')}</td></tr>`}).join('');
+  $('#cdRuns').innerHTML=c.runs.length?`<table><thead><tr><th>Run</th><th>Result</th><th>Tests</th><th>Started</th><th>Took</th>${hasBr?'<th>Branch</th>':''}${hasOpts?'<th>Options</th>':''}<th>Machine</th><th>Trigger</th></tr></thead><tbody>${rows}</tbody></table>`
     :'<div style="padding:14px;color:var(--faint)">No runs yet.</div>';
   $('#cdRuns').querySelectorAll('tr[data-run]').forEach(tr=>tr.onclick=()=>showRun(+tr.dataset.run));
   const latest=c.runs[0]?.id;
@@ -1259,12 +1408,24 @@ async function pollLog(rid){
     if(!d.done) cd.timer=setTimeout(()=>pollLog(rid),800);
   }catch(e){}
 }
+function branchInfo(){
+  const g=grpInfo($('#fGroup').value), el=$('#fBranchInfo'), own=$('#fBranch').value.trim();
+  $('#fBranch').placeholder=g?.branch?`default: ${g.branch} (from ${g.key})`:'none: the project folder as it is';
+  const b=own||g?.branch;
+  el.textContent=b?`Before pytest starts, the project folder is switched to the latest ${b} from its git remote (git fetch, then checkout). `+
+    `It stays on that branch afterwards. Runs on one machine use one branch at a time, so cards with other branches wait.`
+    :'Empty: pytest runs on whatever is checked out in the project folder.';
+}
+$('#fBranch').oninput=branchInfo;
 function groupInfo(){
+  branchInfo();
   const g=grpInfo($('#fGroup').value), el=$('#fGroupInfo');
   if(!$('#fGroup').value){el.textContent='';return}
   if(!g){el.innerHTML=`<span style="color:var(--queued)">This headline isn't in the config file, so nothing is inherited.</span>`;return}
   const bits=[g.dir&&`runs in <span class="mono">${esc(g.dir)}/</span>`,g.args&&`adds <span class="mono">${esc(g.args)}</span>`,
-    g.env_keys.length&&`env ${g.env_keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', ')}`].filter(Boolean);
+    g.env_keys.length&&`env ${g.env_keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', ')}`,
+    g.env_file&&(g.env_file.exists?`env file <span class="mono">${esc(g.env_file.path)}</span>${g.env_file.keys.length?' ('+g.env_file.keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', ')+')':''}`
+      :`<span style="color:var(--failed)">env file ${esc(g.env_file.path)} not found</span>`)].filter(Boolean);
   el.innerHTML=bits.length?`From <b>${esc(g.key)}</b>: ${bits.join(' · ')}. Values set here override the headline's env.`:'';
 }
 $('#fGroup').onchange=()=>{groupInfo();machineOptions($('#fMachine').value)};
@@ -1289,6 +1450,7 @@ $('#fMachine').onchange=machineInfo;
 function formBody(){
   const name=$('#fTitle').value.trim()||$('#fTarget').value.trim()||'all tests';
   const b={target:$('#fTarget').value.trim(),args:$('#fArgs').value.trim(),env:$('#fEnv').value,timeout:+$('#fTimeout').value||0,grp:$('#fGroup').value||null,machine:$('#fMachine').value||null};
+  b.branch=$('#fBranch').value.trim()||null;
   return cd.kind==='test'?{name,...b}:{title:name,...b,optset:$('#fOpt').value.trim()||null};
 }
 const base=()=>cd.kind==='test'?'/tests':'/cards';
@@ -1312,6 +1474,7 @@ $('#cdRun').onclick=async()=>{
     cd.followLatest=true;cd.runId=-1;refresh(true);setTimeout(()=>loadCard(false),600);
   }catch(e){toast(e.message,true)}
 };
+$('#cdAttach').onclick=()=>{if(cd.attach)openShell(cd.attach.machine,cd.attach)};
 $('#cdStop').onclick=()=>api('POST',`/cards/${cd.id}/stop`).then(()=>{refresh(true);setTimeout(()=>loadCard(false),800)}).catch(e=>toast(e.message,true));
 $('#cdDelete').onclick=async()=>{
   const isTest=cd.kind==='test';
@@ -1337,7 +1500,14 @@ $('#cdSchedule').onclick=async()=>{
 
 /* ---------------- machine dialog */
 const machDlg=$('#machDlg'); let md={name:null};
-const MF={mName:'name',mHost:'host',mUser:'user',mPort:'port',mSlots:'slots',mIdentity:'identity',mWorkdir:'workdir',mPython:'python',mEnv:'env',mSshOpts:'ssh_options',mNotes:'notes'};
+const MF={mName:'name',mHost:'host',mUser:'user',mPort:'port',mSlots:'slots',mIdentity:'identity',mWorkdir:'workdir',mPython:'python',mEnv:'env',mSshOpts:'ssh_options',mNotes:'notes',
+  mEnvFile:'env_file',mRemoteEnv:'remote_env_file'};
+const ENV_FILE_HINT=$('#mEnvFileInfo').innerHTML;
+function envFileInfo(m){  // what the server found in a machine's env file (names only)
+  const i=m?.env_file_info, el=$('#mEnvFileInfo');
+  el.innerHTML=!i?ENV_FILE_HINT:!i.exists?`<span style="color:var(--failed)">Not found: <span class="mono">${esc(i.path)}</span></span>`
+    :`<span class="mono">${esc(i.path)}</span>: ${i.keys.length?i.keys.map(k=>`<span class="mono">${esc(k)}</span>`).join(', '):'no variables'}`+(i.error?`<br><span style="color:var(--failed)">${esc(i.error)}</span>`:'');
+}
 function statusBox(st){
   st=st||{state:'unknown'};
   const b=$('#mdStatus'); b.className='mstat st-'+st.state;
@@ -1357,6 +1527,7 @@ function fillMachineForm(m,skip=new Set()){
   if(m&&m.slots===1&&!skip.has('slots')) $('#mSlots').value='';
   if(m&&m.python==='python3 -m pytest'&&!skip.has('python')) $('#mPython').value='';
   $('#mSync').checked=!!m?.sync;
+  envFileInfo(skip.size?null:m);
 }
 const CLONE_SKIP=new Set(['name','host']);  // a copy gets its own name and host / IP address
 let cloneFrom=null;
@@ -1404,7 +1575,7 @@ $('#mdSave').onclick=async()=>{
     toast(md.name?'Machine saved':`Added ${r.name}; testing the connection…`); md.name=r.name; await refresh(true);
     $('#mdHead').textContent=r.name; $('#mdDelete').hidden=false; $('#mdCheck').hidden=false; $('#mdShell').hidden=false; $('#mdDup').hidden=false;
     $('#mCloneWrap').hidden=true; cloneFrom=null; if(machInfo(r.name)?.env!=null) $('#mEnv').value=machInfo(r.name).env;
-    statusBox(machInfo(r.name)?.status);
+    statusBox(machInfo(r.name)?.status); envFileInfo(machInfo(r.name));
   }catch(e){toast(e.message,true)}
 };
 $('#mdCheck').onclick=async()=>{
@@ -1511,33 +1682,45 @@ function drawHelp(){
   const name=v('name')||'lab-01', host=v('host')||'HOST', user=v('user'), port=v('port'), keyIn=v('identity'), key=keyIn||DEF_KEY;
   const wd=v('workdir')||'~/git', py=v('python')||'python3 -m pytest', opts=helpDlg._sshOpts||'';  // same defaults as the server
   const dest=shq(user?`${user}@${host}`:host), P=port?` -p ${shq(port)}`:'', O=opts?` ${opts}`:'';
-  const existing=!!machInfo($('#hPick').value);
+  const existing=!!machInfo($('#hPick').value), win=srv.os==='windows';
+  // PowerShell (board on Windows): key paths under $env:USERPROFILE, 'single quotes' escaped by doubling
+  const psq=t=>`'${String(t).replace(/'/g,"''")}'`;
+  const wpath=k=>k.startsWith('~/')||k.startsWith('~\\')?`"$env:USERPROFILE\\${k.slice(2).replace(/\//g,'\\')}"`:`"${k}"`;
   $('#hIntro').innerHTML=`The board connects to machines with <b>ssh</b>, as the account it runs as: <b class="mono">${esc(me)}</b> on <b class="mono">${esc(box)}</b>.
-    It only uses key-based login (it never asks for a password), so run steps 1–3 <b>once per machine, as ${esc(me)}, on ${esc(box)}</b>.
-    If the board runs as a systemd service, that's the <code class="mono">User=</code> in <span class="mono">pytest-board.service</span>; switch to it with <code class="mono">sudo -iu ${esc(me)}</code>.`;
+    It only uses key-based login (it never asks for a password), so run steps 1–3 <b>once per machine, as ${esc(me)}, on ${esc(box)}</b>`+
+    (win?`, in <b>PowerShell</b>. If the board runs as a service or scheduled task, that's the account it runs under.`
+      :`. If the board runs as a systemd service, that's the <code class="mono">User=</code> in <span class="mono">pytest-board.service</span>; switch to it with <code class="mono">sudo -iu ${esc(me)}</code>.`);
   const cmd=(c)=>`<div class="hcmd"><pre>${esc(c)}</pre><button type="button" data-copy="${esc(c)}">Copy</button></div>`;
   const step=(n,title,body)=>`<div class="hstep"><div class="hnum">${n}</div><div><h3>${title}</h3>${body}</div></div>`;
   const remote=`cd ${shq(wd)} && ${py} --version`;  // py is already shell syntax
   const ini=[`[machine:${name}]`,`host     = ${v('host')||'HOST'}`,user&&`user     = ${user}`,port&&`port     = ${port}`,`identity = ${key}`,
     v('workdir')&&`workdir  = ${v('workdir')}`,v('python')&&`python   = ${v('python')}`].filter(Boolean).join('\n');
-  $('#hSteps').innerHTML=
-    step(1,'Create a key for the board',`<p>Skip this if <code>${esc(key)}</code> already exists. <code>-N ''</code> gives it no passphrase, so the board can use it unattended.</p>`+
-      cmd(`ssh-keygen -t ed25519 -f ${shq(key)} -N ''`))+
-    step(2,'Copy the public key to the machine',`<p>This asks for the password of <code>${esc(user||me)}</code> on <code>${esc(host)}</code> one last time.</p>`+
-      cmd(`ssh-copy-id -i ${shq(key+'.pub')}${P}${O} ${dest}`))+
-    step(3,'Check that it works without a password',`<p>It should print the pytest version without asking anything. On the very first connection you may be asked to accept the host key: answer <code>yes</code>.</p>`+
-      cmd(`ssh -i ${shq(key)}${P}${O} ${dest} ${shq(remote)}`)+
-      (helpDlg._sync?`<p>This machine uses <b>sync</b>, so the folder is created on the first run; "No such file or directory" is fine here as long as you got in without a password.</p>`:''))+
+  const wdest=user?`${user}@${host}`:host;
+  const syncNote=helpDlg._sync?`<p>This machine uses <b>sync</b>, so the folder is created on the first run; "No such file or directory" is fine here as long as you got in without a password.</p>`:'';
+  const s1=win
+    ?step(1,'Create a key for the board',`<p>Skip this if <code>${esc(key)}</code> already exists. When it asks for a passphrase, press <b>Enter twice</b>: no passphrase, so the board can use the key unattended.</p>`+
+        cmd(`ssh-keygen -t ed25519 -f ${wpath(key)}`))
+    :step(1,'Create a key for the board',`<p>Skip this if <code>${esc(key)}</code> already exists. <code>-N ''</code> gives it no passphrase, so the board can use it unattended.</p>`+
+        cmd(`ssh-keygen -t ed25519 -f ${shq(key)} -N ''`));
+  const s2=win
+    ?step(2,'Copy the public key to the machine',`<p>Windows has no <code>ssh-copy-id</code>; this does the same. It asks for the password of <code>${esc(user||me)}</code> on <code>${esc(host)}</code> one last time.</p>`+
+        cmd(`type ${wpath(key+'.pub')} | ssh${P}${O} ${wdest} "mkdir -p ~/.ssh && chmod 700 ~/.ssh && tr -d '\\r' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"`))
+    :step(2,'Copy the public key to the machine',`<p>This asks for the password of <code>${esc(user||me)}</code> on <code>${esc(host)}</code> one last time.</p>`+
+        cmd(`ssh-copy-id -i ${shq(key+'.pub')}${P}${O} ${dest}`));
+  const s3=step(3,'Check that it works without a password',`<p>It should print the pytest version without asking anything. On the very first connection you may be asked to accept the host key: answer <code>yes</code>.</p>`+
+      cmd(win?`ssh -i ${wpath(key)}${P}${O} ${wdest} ${psq(remote)}`:`ssh -i ${shq(key)}${P}${O} ${dest} ${shq(remote)}`)+syncNote);
+  $('#hSteps').innerHTML=s1+s2+s3+
     step(4,existing?`Point the board at the key`:'Add the machine to the board',
       `<p>${existing?`Open <b>${esc(name)}</b> in the Machines column and set <b>Private key file</b> to <code>${esc(key)}</code>`:`Press <b>Add this machine</b> below (or <b>Add</b> in the Machines column) and set <b>Private key file</b> to <code>${esc(key)}</code>`}. Or put it in <span class="mono">pytest-board.ini</span>:</p>`+cmd(ini))+
     step(5,'Test the connection',`<p>Press <b>Test connection</b> in the machine's dialog, or <b>Check all</b>. The machine turns <b style="color:var(--passed)">green</b> when it's ready,
       <b style="color:var(--queued)">amber</b> when ssh works but the project folder or pytest is missing, and <b style="color:var(--failed)">red</b> when it can't connect.</p>`);
   $('#hNotes').innerHTML=[
     `New host keys are accepted on the first connection; a <b>changed</b> host key is refused. If the machine was reinstalled, remove the old key and connect once: <code>ssh-keygen -R ${esc(shq(host))}</code>`,
-    `Anything in <code>~/.ssh/config</code> of <b>${esc(me)}</b> applies too (aliases, ProxyJump, ports), and so do the machine's <b>Extra ssh options</b>, e.g. <code>-o ProxyJump=bastion</code>.`,
-    `The key file path is on this server, not on the machine.`,
-    `Need to create the project folder or a venv on the machine? Open the machine and press <b>Open shell</b>: it gives you a terminal there, in the project folder.`,
-    `Needed: the OpenSSH client (<code>ssh</code>) on this server; <code>rsync</code> on both ends only if you use sync; <code>sh</code> and Python with pytest on the machine. Nothing from pytest-board is installed there.`,
+    `Anything in <code>${win?'%USERPROFILE%\\.ssh\\config':'~/.ssh/config'}</code> of <b>${esc(me)}</b> applies too (aliases, ProxyJump, ports), and so do the machine's <b>Extra ssh options</b>, e.g. <code>-o ProxyJump=bastion</code>.`,
+    `The key file path is on this server, not on the machine${win?` (<code>~</code> there means <code>%USERPROFILE%</code>)`:''}.`,
+    `Need to create the project folder or a venv on the machine? Open the machine and press <b>Open shell</b>: it gives you a terminal there, in the project folder.${win?' On Windows it needs key login (it can\'t ask for a password), and it keeps the window size it opened with.':''}`,
+    win?`Needed: the OpenSSH client on this server (built into Windows 10/11: <i>Settings → Apps → Optional features → OpenSSH Client</i>); <code>sh</code>, <code>tar</code> and Python with pytest on the machine. Sync copies the project with tar over ssh, so no rsync is needed. Nothing from pytest-board is installed on the machine.`
+      :`Needed: the OpenSSH client (<code>ssh</code>) on this server; <code>sh</code> and Python with pytest on the machine. For sync, <code>rsync</code> on both ends makes it faster (only changed files are sent); without it the board copies with tar over ssh. Nothing from pytest-board is installed on the machine.`,
   ].map(x=>`<li>${x}</li>`).join('');
   $('#hAdd').textContent=existing?`Open ${name}`:'Add this machine';
 }
@@ -1841,9 +2024,11 @@ class MiniTerm{
 
 /* ---------------- "Open shell": an ssh terminal on a machine, in the browser */
 const shellDlg=$('#shellDlg');
+makeWindow(shellDlg);  // movable and resizable like the card window; the terminal re-fits as it changes
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const b64bytes=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-let shell={id:null,name:null,term:null,off:0,q:'',sending:false,gen:0,closed:true};
+let shell={id:null,name:null,att:null,term:null,off:0,q:'',sending:false,gen:0,closed:true};
+const SH_HINT=$('#shHint').innerHTML;
 function shellState(st,code){
   const el=$('#shState'); el.className='sh-state '+st;
   el.textContent=st==='open'?'connected':st==='connecting'?'connecting…':'closed'+(code?` · exit ${code}`:'');
@@ -1856,16 +2041,25 @@ function shellTerm(){
   }
   return shell.term;
 }
+let shResizeTimer=null;
 function shellFit(){
   const t=shell.term; if(!t||!shellDlg.open) return;
   const {cols,rows}=t.fit();
-  if(t.resize(cols,rows)&&shell.id&&!shell.closed) api('POST',`/shells/${shell.id}/resize`,{cols,rows}).catch(()=>{});
+  if(t.resize(cols,rows)&&shell.id&&!shell.closed){  // tell the machine once the size settles, not on every pixel
+    clearTimeout(shResizeTimer);
+    const id=shell.id;
+    shResizeTimer=setTimeout(()=>{if(shell.id===id&&!shell.closed)api('POST',`/shells/${id}/resize`,{cols:t.cols,rows:t.rows}).catch(()=>{})},150);
+  }
 }
-async function openShell(name){
-  const m=machInfo(name); shell.name=name;
-  $('#shHead').textContent=`Shell on ${name}`;
-  $('#shDest').textContent=m?`${m.user?m.user+'@':''}${m.host}${m.port?':'+m.port:''} · ${m.workdir||'~'}`:'';
-  shellDlg.showModal();
+// att: {run, session} attaches to a run's screen session instead of opening a login shell
+async function openShell(name,att){
+  const m=machInfo(name); shell.name=name; shell.att=att||null;
+  $('#shHead').textContent=att?`Run #${att.run} on ${name}`:`Shell on ${name}`;
+  const dest=m?`${m.user?m.user+'@':''}${m.host}${m.port?':'+m.port:''}`:name;
+  $('#shDest').textContent=att?`${dest} · screen session ${att.session}`:m?`${dest} · ${m.workdir||'~'}`:'';
+  $('#shHint').innerHTML=att?'<b>Detach: Ctrl+A, then D</b> (the run keeps going) · Ctrl+C interrupts pytest · select text to copy · Ctrl+V pastes'
+    :SH_HINT;
+  shellDlg.showModal(); restoreBox(shellDlg);
   const t=shellTerm(); t.reset();
   await new Promise(r=>requestAnimationFrame(r));
   const {cols,rows}=t.fit(); t.resize(cols,rows);
@@ -1874,9 +2068,10 @@ async function openShell(name){
 async function startShell(){
   const t=shell.term, gen=++shell.gen;
   shell.id=null; shell.off=0; shell.q=''; shell.closed=false; shellState('connecting');
-  t.write(`\x1b[2m[pytest-board] ssh ${$('#shDest').textContent.split(' · ')[0]} …\x1b[0m\r\n`); t.el.focus();
+  t.write(`\x1b[2m[pytest-board] ssh ${$('#shDest').textContent.split(' · ')[0]}${shell.att?' · screen -x '+shell.att.session:''} …\x1b[0m\r\n`); t.el.focus();
   try{
-    const d=await api('POST',`/machines/${encodeURIComponent(shell.name)}/shell`,{cols:t.cols,rows:t.rows});
+    const d=shell.att?await api('POST',`/runs/${shell.att.run}/attach`,{cols:t.cols,rows:t.rows})
+      :await api('POST',`/machines/${encodeURIComponent(shell.name)}/shell`,{cols:t.cols,rows:t.rows});
     if(gen!==shell.gen){api('DELETE',`/shells/${d.id}`).catch(()=>{});return}
     shell.id=d.id; shellState('open'); pollShell(d.id,gen);
   }catch(e){
@@ -1897,7 +2092,7 @@ async function pollShell(id,gen){
     shell.off=d.offset;
     if(d.closed){
       shell.closed=true;
-      shell.term.write(`\r\n\x1b[2m[pytest-board] connection closed${d.exit_code?` (exit code ${d.exit_code}${d.exit_code===255?': ssh could not connect or log in':''})`:''}. Reconnect opens a new shell.\x1b[0m\r\n`);
+      shell.term.write(`\r\n\x1b[2m[pytest-board] connection closed${d.exit_code?` (exit code ${d.exit_code}${d.exit_code===255?': ssh could not connect or log in':''})`:''}. ${shell.att?'Reconnect attaches again while the run goes on.':'Reconnect opens a new shell.'}\x1b[0m\r\n`);
       shellState('closed',d.exit_code); return;
     }
   }
@@ -1913,6 +2108,7 @@ shellDlg.addEventListener('cancel',e=>e.preventDefault());  // Esc belongs to th
 shellDlg.addEventListener('close',()=>{
   endShell();
   const name=shell.name; if(!name) return;
+  if(shell.att){if(cardDlg.open)loadCard(false);return}  // detached from a run: it goes on
   // re-test the machine: the folder or venv may exist now
   if(machDlg.open&&md.name===name) statusBox({state:'checking'});
   api('POST',`/machines/${encodeURIComponent(name)}/check`).then(st=>{if(machDlg.open&&md.name===name)statusBox(st);refresh(true)}).catch(()=>{});

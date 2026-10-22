@@ -84,9 +84,60 @@ Add more `[SECTION]`s later if you test several systems or components.
 
 - **No restart needed:** save the file and the board updates within a few seconds. If the file has an error, the last good headlines stay and the error shows at the bottom of the library.
 - **Headline settings apply when a run starts**, so changing `env`/`args`/`dir` in the file affects the next run of every card under that headline. A test's own env values win over the headline's.
-- **Secrets:** `env` values never leave the server; the UI only shows their names.
+- **Secrets:** `env` values never leave the server; the UI only shows their names. To keep them out of the config file, use `.env` files (next section).
 - **`tests =` lines are added once.** Deleting one in the UI doesn't bring it back. Tests from a section you remove stay in the library, marked "not in the config file".
 - **Every test and card has a headline** (changeable in its dialog), and board cards carry a coloured headline tag.
+
+## Git branches
+
+A card can name a **git branch** (the *Git branch* field in its dialog). Before pytest starts, the board switches the project folder to the latest version of that branch:
+
+1. `git fetch` from the folder's remote (`origin`, or its only remote);
+2. `git checkout <branch>`, creating it from the remote branch the first time;
+3. `git merge --ff-only`, so the branch is exactly what's on the remote.
+
+The folder is the machine's `workdir` for runs on a machine, and `--root` for runs on this server. The folder stays on that branch afterwards. The log shows the commit that was tested (`[pytest-board] at 3f2a1c9 Fix login (anna, 2 hours ago)`), and the run history has a *Branch* column.
+
+**Where a branch comes from:** the card's own branch, else its headline's `branch =` in pytest-board.ini, else none. With none, pytest runs on whatever is checked out. Library tests have the field too, and copies dragged onto the board take it along. A branch inherited from the headline shows dashed on the card.
+
+**One branch per machine at a time:** because runs switch the project folder itself, the runs going on at the same time on one machine all use the same branch. A card on another branch waits in Queued (*after feature/x* on the card) until those runs are done. Cards on the same branch run side by side, up to the machine's `slots`: the first one fetches and checks out, and the others use that checkout as it is. Cards without a branch count as one more group, "the folder as it is".
+
+**The run doesn't start** (*git checkout failed*, with the reason in the log) when:
+- the folder isn't a git checkout, or has no remote;
+- the branch isn't on the remote. Give the name without `origin/`;
+- the folder has uncommitted changes to tracked files (`git status`): the board won't switch branches over your work. Untracked files, like `.env` or test output, don't count;
+- the local branch has commits that aren't on the remote, so it can't be fast-forwarded;
+- `git fetch` fails, e.g. the machine can't log in to the git server.
+
+git never waits for a password there (`GIT_TERMINAL_PROMPT=0`, ssh in batch mode). Machines need read access of their own, e.g. a deploy key or a public https remote. Branches don't work with `sync = yes`, because the machine then gets a copy of the project without git. Keep a git checkout on the machine instead.
+
+## Environment variables and .env files
+
+Besides `env =` in pytest-board.ini and the Environment box of a test, variables can come from `.env` files. These are shell-style files, one variable per line, the way you'd `source` them:
+
+```bash
+# pytest-board/.env
+export BASE_URL=https://staging.example.com
+export API_TOKEN='s3cr3t'           # 'single quotes' are literal, "double quotes" expand $VAR
+DATA_DIR="${HOME}/test-data"        # export is optional; comments and blank lines are fine
+```
+
+| File | Lives on | Applies to |
+|---|---|---|
+| `.env` next to pytest-board.ini (or `--env-file PATH`) | the board server | every run |
+| `env_file = path` under a `[machine:NAME]` (or *Env file on this server* in the machine dialog) | the board server | runs on that machine |
+| `env_file = path` under a headline | the board server | that headline's tests |
+| the machine's own `.env` in its project folder (`remote_env_file =` / *Env file on the machine* to change it, `none` to turn it off) | the machine | runs on that machine |
+
+Relative `env_file` paths start at the folder of pytest-board.ini. When the same variable is set in several places, the most specific one wins:
+
+**`.env` on the server < the machine's own `.env` < machine `env_file` < machine `env` < headline `env_file` < headline `env` < the test's own env.**
+
+- **No restart needed:** files are read when a run starts, so edits apply to the next run.
+- **Files on the board server** are read by the board and sent to runs like `env =` values: never on a command line, and the UI only shows the variable names. `$VAR` / `${VAR}` refer to earlier lines, then to the board's own environment (so `$HOME` is the board server's). Commands (`$(…)`, backticks) are not run there. A line the board can't read is skipped and shown as a problem at the bottom of the library and in the run's log.
+- **The machine's own `.env`** is loaded there with `set -a; . ./.env` just before pytest starts, so any sh syntax works and `$HOME` is the machine's. If it has an error, the run doesn't start (*could not start*, with sh's message). The health check shows "loads …/.env" when it finds one.
+- `PYTEST_BOARD_TOKEN` in a `.env` file is ignored: tests never get the board's password.
+- With `sync = yes`, files called `.env` are not copied to machines, so each machine keeps its own.
 
 ## Machines (remote execution over ssh)
 
@@ -117,20 +168,29 @@ Copies dragged onto the board take the test's machine with them. In the config f
 
 **How a run works:**
 1. The board connects with `ssh -T -o BatchMode=yes …` as the user the board runs as.
-2. It `cd`s to `workdir` plus the headline's `dir`, sets the env, and runs the pytest command.
-3. The script goes over ssh's stdin, so env values (tokens, passwords) never appear on a command line on either side.
-4. The live log streams back as it runs.
-5. Afterwards the junit.xml is copied back and the temp files on the machine are removed.
+2. It starts the run **on the machine, independent of that connection**: in a `screen` session named `pb-run-<run>-<board>` when screen is installed there, otherwise as a background process. The run `cd`s to `workdir` plus the headline's `dir`, sets the env, and runs the pytest command.
+3. The script goes over ssh's stdin, so env values (tokens, passwords) never appear on a command line or in a file on either side.
+4. The board follows the run's log and shows it live.
+5. When it's done, the board fetches the exit code and junit.xml and removes the run's folder on the machine (`~/.pytest-board/runs/`).
 
-With `sync = yes`, the project (`--root`) is first copied to `workdir` with rsync, skipping `.git`, caches and the board's data.
+**Network drops and board restarts don't end runs.** Because the run doesn't depend on the ssh connection:
+- **Connection lost:** the run goes on. The card shows *reconnecting*, and the board keeps trying (every 5 s at first, then up to every minute). Once it gets through, it catches up on the output from where it left off, so the log has no gaps and no repeats. A line in the log says when the connection went and came back.
+- **Board restarted** (update, reboot, `systemctl restart`): runs on machines carry on, and the board picks them up again when it starts. Runs that finished meanwhile get their results collected. Runs on **this server** are still ended by a restart and marked *interrupted*.
+- **Stop and timeout** end the run on the machine (pytest and everything it started). If the machine can't be reached at that moment, the card is stopped right away and the run there is ended as soon as the machine answers again.
+- **Queued cards wait** while their machine is unreachable (*waiting for …* on the card) and start once it answers again; they don't fail. The board checks an unreachable machine every 30 s while something is waiting for it.
+- A run that ends without an exit code (the machine restarted, or someone killed it there) is labelled *run lost*.
 
-**Stop and timeout** kill the pytest process on the machine too, not just the local ssh connection.
+**Attach:** while a card runs in a screen session, its dialog has an **Attach** button. It opens a terminal in the browser, inside that session: you can watch pytest live, or use a debugger (`breakpoint()`, `--pdb`). **Ctrl+A, then D** detaches (the run keeps going), and closing the window does the same. **Ctrl+C** interrupts pytest, which still prints its summary and writes the junit.xml. From any other terminal: `screen -ls`, then `screen -x pb-run-…`. Without screen on the machine, runs work the same, but there's no session to attach to: `sudo apt install screen` there.
+
+**Tidying up:** run folders are removed once their results are in. Leftovers (from a run stopped while its machine was down, or a board that crashed) are cleaned up by the next successful health check: anything still running there is ended first. Temp files from older pytest-board versions in `/tmp` are removed too.
+
+With `sync = yes`, the project (`--root`) is first copied to `workdir`, skipping `.git`, caches and the board's data. The board uses rsync when it's installed (only changed files are sent); otherwise, and always on Windows, it streams the project as a tar archive over ssh (everything is sent each time, and the machine needs `tar`).
 
 **Open shell:** the machine dialog has an **Open shell** button that opens a terminal on that machine, right in the browser. It connects with ssh as the board's user and starts in the machine's `workdir`. If that folder doesn't exist yet, you land in your home folder with the `mkdir` command to create it. Use it to create folders, set up a venv, `pip install -r requirements.txt` and so on. It's a real terminal: colours, Tab completion, Ctrl+C, and `vim`, `top` or `less` all work. Select text to copy, Ctrl+V to paste, and Shift+PgUp/PgDn to scroll back. Unlike test runs, it may ask for a password or key passphrase, so it also works before key login is set up. Closing it ends the session and re-tests the machine, and a shell left open in a closed browser tab is ended after about 90 seconds.
 
-**Health checks** run every 2 minutes (`--check-interval`) and whenever you press **Check all** or **Test connection**. Each one connects, checks that `workdir` exists and runs `pytest --version`. A machine is shown green (ready), amber (connected but folder or pytest missing) or red (can't connect).
+**Health checks** run every 2 minutes (`--check-interval`) and whenever you press **Check all** or **Test connection**. Each one connects, checks that `workdir` exists and runs `pytest --version`. A machine is shown green (ready), amber (connected but folder or pytest missing) or red (can't connect). A red machine with queued cards or runs waiting for it is checked every 30 s, even with `--check-interval 0`.
 
-**Failure outcomes:** a failed run on a machine is labelled *machine unreachable* (ssh exit 255), *remote folder missing*, *sync failed*, *pytest not found* or *machine not defined*, instead of a bare exit code.
+**Failure outcomes:** a failed run on a machine is labelled *remote folder missing*, *sync failed*, *pytest not found*, *could not start*, *run lost* or *machine not defined*, instead of a bare exit code. *Machine unreachable* in a card's history is an attempt that couldn't connect: the card went back to Queued and waited.
 
 **Slots:** each machine runs up to `slots` tests at once. Queued cards for a busy machine wait, while cards for other machines go ahead.
 
@@ -144,9 +204,9 @@ New host keys are accepted on first connect (`StrictHostKeyChecking=accept-new`)
 
 ## Requirements
 
-- Python 3.8+ on the box. The server uses **only the standard library**, so there's nothing to pip install.
+- Python 3.8+ on the board server, which can run **Linux, macOS or Windows** (see [Running on Windows](#running-on-windows)). The server uses **only the standard library**, so there's nothing to pip install.
 - pytest installed wherever your tests run (for example your project's venv, locally or on each machine).
-- For machines: the OpenSSH client on the board server (`ssh`), and `rsync` on both ends only if you use `sync = yes`. The machines need `sh` and Python/pytest, and nothing else from pytest-board.
+- For machines: the OpenSSH client on the board server (`ssh`). The machines are Linux (or other Unix) boxes with `sh` and Python/pytest, plus `tar` if you use `sync = yes` (or `rsync` on both ends, which makes sync faster). `screen` is recommended (needed for **Attach**), and `git` is needed for cards with a [git branch](#git-branches). Nothing from pytest-board is installed on them; runs use a folder in the ssh user's home, `~/.pytest-board/runs/`.
 
 ## Run it
 
@@ -174,6 +234,7 @@ Open `http://<box>:8765`. With `--token`, the browser asks for a login: any user
 | `--workers` | 2 | parallel runs on **this server**; machines use their own `slots` |
 | `--ssh` / `--rsync` | `ssh` / `rsync` | client binaries used for machines |
 | `--check-interval` | 120 | seconds between automatic machine health checks (0 = manual only) |
+| `--env-file` | `.env` next to the config file | variables for every run (see [.env files](#environment-variables-and-env-files)) |
 
 **Security:** this UI runs commands as the service user, so don't expose it without `--token`. Better still, keep the default `127.0.0.1` binding and use an SSH tunnel: `ssh -L 8765:localhost:8765 box`, then browse to `http://localhost:8765`. Requests that another website tries to send through your browser (cross-origin POST/PATCH/DELETE) are refused, and when bound to localhost only `localhost` / `127.0.0.1` Host headers are accepted. If you put a reverse proxy in front, make it pass the original `Host` header through. Tests never see `PYTEST_BOARD_TOKEN` in their environment.
 
@@ -186,9 +247,29 @@ sudo cp pytest-board.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now pytest-board
 ```
 
-The board survives restarts. Runs that were in progress when the server stopped are marked *interrupted*.
+The board survives restarts. Runs on machines go on while it's stopped and are picked up again when it starts; runs on this server that were in progress are marked *interrupted*.
 
 **Upgrading from an earlier version:** replace the files, add your `pytest-board.ini`, and restart. The existing `board.db` is upgraded automatically and your cards and run history are kept. Existing library tests appear under "No headline"; open one and pick a headline to move it. Custom swimlanes (Smoke, Regression, …) from older versions are gone: every card moves to the row of the machine it runs on.
+
+## Running on Windows
+
+The board server also runs on Windows 10/11 (the machines it runs tests on stay Linux boxes; "This server" runs tests on the Windows PC itself).
+
+1. Install Python 3.8+ from python.org, and the **OpenSSH Client** (*Settings → Apps → Optional features*; `ssh -V` in PowerShell shows whether it's there).
+2. Start the board in PowerShell. Backslash paths are fine; put paths with spaces in double quotes:
+
+   ```powershell
+   py C:\pytest-board\server.py --root C:\work\my-project `
+      --pytest "C:\work\my-project\.venv\Scripts\python.exe -m pytest" --token change-me
+   ```
+
+3. ssh keys live in `%USERPROFILE%\.ssh` of the account the board runs as, and `~` in a machine's *Private key file* means `%USERPROFILE%`. **Help setup** shows the PowerShell versions of the key commands (Windows has no `ssh-copy-id`).
+
+Differences from Linux:
+- **Sync** copies the project with tar over ssh (no rsync needed).
+- **Open shell** works through ssh's own pipes: login must be key-based (it can't show a password prompt), and the terminal keeps the size it was opened with.
+- **Stop** and timeouts end pytest and everything it started (`taskkill /T`).
+- **Starting with Windows:** use Task Scheduler instead of the systemd file. *Create Task* → "Run whether user is logged on or not", trigger *At startup*, action *Start a program*: `py`, arguments `C:\pytest-board\server.py --root C:\work\my-project --token change-me`. The task's account is the one whose `.ssh` keys are used.
 
 ## Notes
 
