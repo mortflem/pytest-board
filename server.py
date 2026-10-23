@@ -45,6 +45,17 @@ try:
 except Exception:  # no passwd entry / login name (unusual containers)
     SERVICE_USER = str(os.getuid()) if hasattr(os, "getuid") else ""
 STATIC = HERE / "static"
+# Bump together with PAGE_VERSION in static/index.html when the page needs this server (the page asks for a
+# restart when the running server is older than the page).
+BOARD_VERSION = "2026.10.23.2"
+
+
+def page_stamp():
+    """Changes whenever static/index.html changes on disk: an open page then reloads itself."""
+    try:
+        return str((STATIC / "index.html").stat().st_mtime_ns)
+    except OSError:
+        return ""
 
 # --------------------------------------------------------------------------- platform (Linux / macOS / Windows)
 IS_WIN = os.name == "nt"
@@ -234,7 +245,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS tests(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL, target TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '',
   env TEXT NOT NULL DEFAULT '', timeout INTEGER NOT NULL DEFAULT 0, position REAL NOT NULL DEFAULT 0,
-  created REAL, updated REAL, grp TEXT, machine TEXT, optsets TEXT, branch TEXT);
+  created REAL, updated REAL, grp TEXT, machine TEXT, optsets TEXT, branch TEXT, extra_args TEXT);
 CREATE TABLE IF NOT EXISTS seeded(grp TEXT NOT NULL, spec TEXT NOT NULL, PRIMARY KEY(grp, spec));
 CREATE TABLE IF NOT EXISTS machines(
   id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, host TEXT NOT NULL, user TEXT NOT NULL DEFAULT '',
@@ -541,11 +552,6 @@ class Groups:
             if g["dir"] and not self.cwd(g).is_dir():
                 problems.append(f"[{key}] dir not found: {g['dir']}")
             items.append(g)
-        names = {m["name"] for m in machines}
-        for g in items:
-            if g["machine"] and g["machine"] != "local" and g["machine"] not in names:
-                problems.append(f"[{g['key']}] machine '{g['machine']}' has no [machine:{g['machine']}] section "
-                                "(fine if it was added in the UI)")
         with self.lock:
             self.items = items
             self.by_key = {g["key"]: g for g in items}
@@ -740,6 +746,8 @@ class Store:
         for table in ("tests", "cards", "runs"):  # v9: git branches
             if "branch" not in self._cols(table):
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN branch TEXT")
+        if "extra_args" not in self._cols("tests"):  # v10: extra arguments last used for a test's copies
+            self.db.execute("ALTER TABLE tests ADD COLUMN extra_args TEXT")
         for col in ("env_file", "remote_env_file"):  # v8: .env files
             if col not in self._cols("machines"):
                 self.db.execute(f"ALTER TABLE machines ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
@@ -1626,19 +1634,19 @@ done
             return self._rpath(f), f
         return "./" + shlex.quote(f), posixpath.join(m["workdir"] or "~", f)
 
-    def _source_machine_env(self, m):
+    def _source_machine_env(self, m, errfile='"$D/env.err"'):
         """sh lines for the launcher: load the machine's own .env (as `set -a; . file`), if it has one."""
         mf = self._machine_env_file(m)
         if not mf:
             return ""
         f, shown = mf
         return (f"if cd {self._rpath(m['workdir'] or '~')} 2>/dev/null && [ -f {f} ]; then\n"
-                f'  if ( . {f} ) >/dev/null 2>"$D/env.err"; then\n'
+                f'  if ( . {f} ) >/dev/null 2>{errfile}; then\n'
                 f"    set -a; . {f} >/dev/null 2>&1; set +a\n"
                 f"    printf 'PB_NOTE loaded %s on {m['name']}\\n' {shlex.quote(shown)}\n"
                 f"  else\n"
                 f"    printf 'PB_ERR %s on {m['name']} has an error: %s\\n' {shlex.quote(shown)} "
-                f'"$(head -c 300 "$D/env.err" | tr \'\\n\' \' \')"; exit 3\n'
+                f'"$(head -c 300 {errfile} | tr \'\\n\' \' \')"; exit 3\n'
                 f"  fi\n"
                 f"fi\n"
                 f"cd\n")
@@ -2175,7 +2183,14 @@ done
                 "command_preview": " ".join(shlex.quote(a) for a in self.remote_argv(item, m, g)),
                 "machine_env_keys": sorted(m["env"])}
 
-    def discover(self, grp=None):
+    def discover(self, grp=None, machine=None):
+        """pytest --collect-only for a headline: on this server (in --root), or on a machine over ssh (in its
+        project folder, with its pytest command and env). The folder is used as it is: no branch is checked out."""
+        if machine and machine != "local":
+            m = self.machines.get(machine)
+            if not m:
+                return {"ids": [], "error": f"machine '{machine}' is not defined", "grp": grp, "machine": machine}
+            return self._discover_remote(m, grp)
         item = {"grp": grp}
         g = self.groups.get(grp)
         cmd = (list(self.pytest_cmd) + split_local(g["args"] if g else "")
@@ -2190,8 +2205,56 @@ done
         err = None
         if p.returncode not in (0, 5):
             err = (p.stdout[-4000:] + "\n" + p.stderr[-4000:]).strip()
+        try:
+            branch = subprocess.run(["git", "-C", str(cwd), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True,
+                                    text=True, timeout=20, stdin=subprocess.DEVNULL, **QUIET_KW).stdout.strip()
+        except (OSError, subprocess.TimeoutExpired):
+            branch = ""
         return {"ids": ids, "error": err, "command": show_local(cmd), "cwd": str(cwd),
-                "grp": grp}
+                "grp": grp, "machine": "local", "branch": branch}
+
+    def _discover_remote(self, m, grp):
+        item = {"grp": grp}
+        g = self.groups.get(grp)
+        wd = self.remote_dir(m, g)
+        argv = self.remote_argv(item, m, g) + ["--collect-only", "-q", "-p", "no:cacheprovider"]
+        low, high = self.remote_env_layers(item, m, g)
+        shown = " ".join(shlex.quote(a) for a in argv)
+        out = {"ids": [], "error": None, "command": f"ssh {self.dest(m)} · cd {wd} && {shown}",
+               "cwd": f"{self.dest(m)}:{wd}", "grp": grp, "machine": m["name"], "branch": ""}
+        script = "".join([
+            'E="${TMPDIR:-/tmp}/pytest-board-discover-$$.err"; trap \'rm -f "$E"\' EXIT\n',
+            *(f"export {k}={shlex.quote(v)}\n" for k, v in low.items()),
+            self._source_machine_env(m, errfile='"$E"'),
+            *(f"export {k}={shlex.quote(v)}\n" for k, v in high.items()),
+            f"cd {self._rpath(wd)} 2>/dev/null || {{ echo PB_NO_DIR; exit 97; }}\n",
+            "printf 'PB_BRANCH %s\\n' \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null)\"\n",
+            " ".join(self._rword(a) for a in argv) + "\n",
+        ])
+        try:
+            r = subprocess.run(self.ssh_base(m) + [self.dest(m), "sh -s"], input=script.encode(), capture_output=True,
+                               timeout=600, cwd=str(self.root), **QUIET_KW)
+        except subprocess.TimeoutExpired:
+            out["error"] = f"no answer from {m['name']} within 10 minutes"
+            return out
+        except OSError as e:
+            out["error"] = f"cannot run {self.ssh_cmd[0]}: {e}"
+            return out
+        text, err = r.stdout.decode("utf-8", "replace"), r.stderr.decode("utf-8", "replace")
+        lines = text.splitlines()
+        out["branch"] = next((ln[10:].strip() for ln in lines if ln.startswith("PB_BRANCH ")), "")
+        bad = next((ln[7:] for ln in lines if ln.startswith("PB_ERR ")), None)
+        if r.returncode == 255:
+            out["error"] = f"can't reach {m['name']}: {self._ssh_error(r.stderr) or 'ssh exit code 255'}"
+        elif "PB_NO_DIR" in lines:
+            out["error"] = f"the project folder {wd} doesn't exist on {m['name']}"
+        elif bad:
+            out["error"] = bad
+        else:
+            out["ids"] = [ln.strip() for ln in lines if "::" in ln and not ln.startswith((" ", "=", "PB_"))]
+            if r.returncode not in (0, 5):
+                out["error"] = (text[-4000:] + "\n" + err[-4000:]).strip()
+        return out
 
 
 # --------------------------------------------------------------------------- interactive shells (Open shell)
@@ -2545,7 +2608,7 @@ class App:
     def board(self, q, body):
         since = q.get("since")
         if since and since == str(self.s.version):
-            return {"version": self.s.version, "unchanged": True}
+            return {"version": self.s.version, "unchanged": True, "page": page_stamp(), "board_version": BOARD_VERSION}
         cards = self.s.q("""
             SELECT c.*, r.outcome AS last_outcome, r.started AS last_started, r.finished AS last_finished,
                    r.total AS last_total, r.passed AS last_passed, r.failed AS last_failed,
@@ -2581,7 +2644,7 @@ class App:
             "groups_config": {
                 "path": str(self.r.groups.path) if self.r.groups.path else None,
                 "exists": self.r.groups.mtime is not None,
-                "error": self.r.groups.error,
+                "error": self._config_error(),
                 "env_file": env_file_info(self.r.env_file),  # .env for every run (names only)
             },
             "server": {
@@ -2595,8 +2658,20 @@ class App:
                 "os": "windows" if IS_WIN else sys.platform,  # Help setup shows PowerShell commands on Windows
                 "sync": self.r.sync_method(),                 # rsync, or tar over ssh
                 "hostname": socket.gethostname(),
+                "board_version": BOARD_VERSION,
             },
+            "page": page_stamp(),
         }
+
+    def _config_error(self):
+        """Problems in the config file, plus headlines naming a machine that exists neither in the file nor in
+        the UI (machines added in the UI are fine to name)."""
+        problems = [self.r.groups.error] if self.r.groups.error else []
+        for g in self.r.groups.items:
+            if g["machine"] and g["machine"] != "local" and not self.r.machines.get(g["machine"]):
+                problems.append(f"[{g['key']}] machine '{g['machine']}' isn't defined: add it in the Machines column "
+                                f"or as a [machine:{g['machine']}] section")
+        return "; ".join(problems) or None
 
     # ---- swimlanes: one per machine ('local' = this server). A card's lane is the machine it runs on.
     def _default_lane(self):
@@ -2777,13 +2852,17 @@ class App:
 
     def test_bulk(self, q, body):
         grp = _grp(body)
+        # found on a machine (Discover there): the new tests run there, unless their headline does already
+        machine = self._machine_ref(body) if body.get("machine") else None
+        if machine and self.r.resolve_machine({"grp": grp})[0] == machine:
+            machine = None
         existing = {r["target"] for r in self.s.q("SELECT target FROM tests WHERE grp IS ?", (grp,))}
         n = 0
         for t in body.get("targets") or []:
             target = shlex.quote(t)
             if target in existing:
                 continue  # already under this headline
-            self.test_create(q, {"name": _default_name(t), "target": target, "grp": grp})
+            self.test_create(q, {"name": _default_name(t), "target": target, "grp": grp, "machine": machine})
             existing.add(target)
             n += 1
         return {"created": n, "skipped": len(body.get("targets") or []) - n}
@@ -2838,15 +2917,28 @@ class App:
             if "optsets" in body:
                 sets = parse_optsets(body["optsets"])
                 self.s.x("UPDATE tests SET optsets=? WHERE id=?", (json.dumps(sets) if sets else None, tid))  # next time
+                if body.get("combine"):  # one card with all of them ({"combine": true}, what the UI sends)
+                    sets = [normalize_optset(" ".join(x for x in sets if x))]
             else:
                 sets = [normalize_optset(body.get("optset"))]
         except ValueError as e:
             raise ApiError(400, str(e))
-        move = {k: v for k, v in body.items() if k not in ("machine", "optsets", "optset")}
+        # extra pytest arguments for every copy ({"extra_args": "--set_temperature 0 10 20"}): they go into each
+        # card's own args, after the test's args, and are offered again next time
+        args = t["args"]
+        if "extra_args" in body:
+            extra = str(body.get("extra_args") or "").strip()
+            try:
+                shlex.split(extra)
+            except ValueError as e:
+                raise ApiError(400, f"extra arguments: {e}")
+            self.s.x("UPDATE tests SET extra_args=? WHERE id=?", (extra or None, tid))
+            args = " ".join(x for x in (t["args"], extra) if x)
+        move = {k: v for k, v in body.items() if k not in ("machine", "optsets", "optset", "extra_args")}
         made, base = [], time.time()
         with self.s.lock:
             for i, optset in enumerate(sets or [None]):
-                card = self.card_create(q, {"title": t["name"], "target": t["target"], "args": t["args"],
+                card = self.card_create(q, {"title": t["name"], "target": t["target"], "args": args,
                                             "env": t["env"], "timeout": t["timeout"], "grp": t["grp"],
                                             "branch": t.get("branch")})
                 self.s.x("UPDATE cards SET test_id=?, machine=?, optset=? WHERE id=?",
@@ -2878,15 +2970,23 @@ class App:
         return t
 
     def cards_clear(self, q, body):
+        """Remove finished cards from the board (their run history stays). Optional filters: "machine" (one row
+        of the board: the cards that run there) and "grp" (one headline; null = cards without one)."""
         statuses = [s for s in (body.get("statuses") or ["passed", "failed"]) if s in ("passed", "failed", "backlog")]
         if not statuses:
             raise ApiError(400, "nothing to clear")
-        sql = f"DELETE FROM cards WHERE status IN ({','.join('?' * len(statuses))})"
-        args = list(statuses)
+        machine = str(body["machine"]) if body.get("machine") else None
+        only_grp = "grp" in body
+        grp = _grp(body) if only_grp else None
         with self.s.lock:
-            n = self.s.one(sql.replace("DELETE FROM", "SELECT COUNT(*) n FROM"), args)["n"]
-            self.s.x(sql, args)
-        return {"cleared": n}
+            ids = [c["id"] for c in self.s.q(f"SELECT id, machine, grp FROM cards WHERE status IN "
+                                              f"({','.join('?' * len(statuses))})", statuses)
+                   if (machine is None or self.r.resolve_machine(c)[0] == machine)
+                   and (not only_grp or c["grp"] == grp)]
+            for i in range(0, len(ids), 500):
+                chunk = ids[i:i + 500]
+                self.s.x(f"DELETE FROM cards WHERE id IN ({','.join('?' * len(chunk))})", chunk)
+        return {"cleared": len(ids)}
 
     # ---- cards
     def _card_fields(self, body, partial=False):
@@ -3136,7 +3236,7 @@ class App:
                 "dest": self.r.dest(m) + (f":{m['port']}" if m["port"] else "")}
 
     def discover(self, q, body):
-        return self.r.discover(q.get("grp") or None)
+        return self.r.discover(q.get("grp") or None, q.get("machine") or None)
 
     # ---- interactive ssh shell on a machine ("Open shell" in the machine dialog)
     def shell_open(self, q, body, name):

@@ -51,6 +51,7 @@ header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var
 .icon:hover{background:var(--surface-2);color:var(--text)}
 .offline{background:var(--failed);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;display:none}
 body.is-offline .offline{display:inline-block}
+.stale{background:var(--queued);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;cursor:help}
 
 /* ---------- library column */
 .workspace{flex:1;display:flex;min-height:0}
@@ -61,6 +62,18 @@ body.is-dragging .library.accepting{outline:2px dashed var(--border-strong);outl
 .lib-head .count{background:var(--surface);border-radius:999px;padding:0 8px;font-weight:600}
 .lib-tools{display:flex;gap:6px;padding:10px 16px 6px}
 .lib-tools .btn{padding:4px 10px;font-size:12.5px;flex:1;justify-content:center}
+.disc-wrap{position:relative;flex:1;display:flex;min-width:0}
+.btn .dcaret{width:11px;height:11px;margin-left:2px;opacity:.7}
+/* "Discover" menu: one entry per machine */
+.menu{position:absolute;top:calc(100% + 4px);right:0;min-width:230px;max-width:calc(100vw - 24px);z-index:40;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-lg);padding:4px;display:flex;flex-direction:column}
+.menu .mh{font-size:11px;font-weight:700;color:var(--faint);padding:5px 10px 4px;text-transform:uppercase;letter-spacing:.04em}
+.menu .mi{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;padding:6px 10px;border:0;background:none;
+  border-radius:6px;text-align:left;font:inherit;font-size:13px;color:var(--text);cursor:pointer}
+.menu .mi:hover,.menu .mi:focus-visible{background:var(--accent-soft);outline:none}
+.menu .mi .st{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.menu .mi.st-online .st{background:var(--passed)} .menu .mi.st-warn .st{background:var(--queued)} .menu .mi.st-offline .st{background:var(--failed)}
+.menu .mi .where{grid-column:2;font:11px var(--mono);color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lib-search{margin:4px 16px 8px;width:auto!important;background:var(--surface)!important}
 .lib-list{flex:1;overflow:auto;padding:4px 16px 12px;display:flex;flex-direction:column;gap:8px}
 .lib-foot{padding:10px 16px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border)}
@@ -188,6 +201,10 @@ button.lane-name{cursor:pointer} button.lane-name:hover{background:var(--surface
 .tgroups .tgroup{min-width:0;margin:0;padding:2px 2px 3px;gap:3px;border-radius:6px;position:relative;
   background:hsl(var(--th) 80% 50% / .07)}
 .tgroups .tgroup.none{background:var(--surface-2)}
+.tgroups .tgroup.multi{background:color-mix(in srgb,var(--muted) 8%,transparent)}
+.tbadge.multi{color:var(--text);background:color-mix(in srgb,var(--muted) 10%,transparent)}
+.tbadge.multi .odots{margin-right:4px}
+.tgroups .tbadge.multi .odots{margin-right:2px}
 .tgroups .tgroup+.tgroup{border-top:0;padding-top:3px}
 .tgroups .tg-head{min-height:16px;gap:3px;justify-content:center}
 .tgroups .tbadge{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;padding:2px 3px;font-size:10.5px;background:transparent}
@@ -206,7 +223,13 @@ button.lane-name{cursor:pointer} button.lane-name:hover{background:var(--surface
 .optrow:last-child{border-bottom:0}
 .optrow:hover{background:var(--surface-2)}
 .optrow code{font:12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
-.optrow .sw{width:10px;height:10px;border-radius:3px;background:hsl(var(--th) 70% 50%)}
+.optrow .sw{width:10px;height:10px;border-radius:50%;background:hsl(var(--th) 70% 50%)}
+/* one coloured dot per option a card runs with (same colours as in the "Run … with" dialog) */
+.odots{display:inline-flex;gap:3px;align-items:center;vertical-align:middle;flex:none}
+.odot{--th:0;width:9px;height:9px;border-radius:50%;background:hsl(var(--th) 70% 50%);flex:none}
+.odot.other{background:transparent;box-shadow:inset 0 0 0 1.5px var(--border-strong)}
+.card.mini .odots{margin-right:4px}
+.card.mini .odot{width:7px;height:7px}
 .optrow.none .sw{background:var(--border-strong)} .optrow.none .ol{color:var(--muted)}
 .optrow .ol{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #optDlg .preview b{font-family:var(--mono);font-weight:600}
@@ -357,6 +380,7 @@ body.resizing *{cursor:inherit!important}
   </div>
   <div class="info" id="info"></div>
   <span class="offline">server unreachable — retrying</span>
+  <span class="stale" id="staleServer" hidden title="The files were updated, but the running board server is the previous version">board server needs a restart</span>
   <select class="gsel" id="grpFilter" title="Show one headline only"><option value="*">All headlines</option></select>
   <input class="search" id="search" placeholder="Filter cards…" autocomplete="off">
   <button class="btn" id="btnHelp" title="How to set up ssh keys for machines"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.2"/><path d="M6.2 6.2a1.9 1.9 0 1 1 2.6 1.75c-.5.22-.8.6-.8 1.15v.4"/><path d="M8 11.4h.01" stroke-width="2.2" stroke-linecap="round"/></svg>Help setup</button>
@@ -375,7 +399,8 @@ body.resizing *{cursor:inherit!important}
     <div class="lib-head"><span class="dot"></span>Test library<span class="count" id="libCount">0</span><button class="icon side-toggle" title="Minimise" aria-label="Minimise Test library"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg></button></div>
     <div class="lib-tools">
       <button class="btn primary" id="btnTest"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>New test</button>
-      <button class="btn" id="btnDiscover"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Discover</button>
+      <div class="disc-wrap"><button class="btn" id="btnDiscover" aria-haspopup="menu" aria-expanded="false" title="Find tests on a machine and add them to the library"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>Discover<svg class="dcaret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></button>
+        <div class="menu" id="discMenu" role="menu" hidden></div></div>
     </div>
     <input class="search lib-search" id="libSearch" placeholder="Filter library…" autocomplete="off">
     <div class="lib-list" id="libList"></div>
@@ -386,15 +411,16 @@ body.resizing *{cursor:inherit!important}
 </div>
 <div class="toast" id="toast"></div>
 
-<!-- option sets dialog (putting a library test on the board): one card per ticked option set -->
+<!-- option sets dialog (putting a library test on the board): one card with every ticked option -->
 <dialog id="optDlg">
   <form method="dialog" style="width:580px">
     <div class="dlg-head"><span style="display:inline-flex;color:var(--accent)" id="odIcon"></span><h2 id="odHead">Option sets</h2></div>
     <div class="dlg-body">
       <p class="help-intro" id="odIntro"></p>
       <div class="optlist" id="odList"></div>
-      <div class="field"><label for="odExtra">More option sets, one per line</label>
-        <textarea id="odExtra" class="mono" rows="2" placeholder="-m smoke --lf&#10;-k login -x"></textarea>
+      <div class="field"><label for="odArgs">Extra arguments</label>
+        <input id="odArgs" class="mono" placeholder="e.g. --set_temperature 0 10 20" autocomplete="off" spellcheck="false">
+        <small>Added as they are to the card's pytest command (they go in its <i>Extra pytest args</i>).</small>
         <small id="odHint"></small></div>
       <div class="preview" id="odPreview"></div>
     </div>
@@ -553,7 +579,7 @@ body.resizing *{cursor:inherit!important}
 <dialog id="discDlg">
   <div class="dlg-head"><h2>Discover tests</h2><button class="icon" onclick="discDlg.close()"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.8"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
   <div class="dlg-body">
-    <div class="row" style="margin-bottom:10px;align-items:center"><label style="flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)">Add under</label><select class="gsel" id="discGroup" style="flex:0 0 220px;max-width:none"></select><input class="search" id="discFilter" placeholder="Filter…" style="width:auto"></div>
+    <div class="row" style="margin-bottom:10px;align-items:center;flex-wrap:wrap"><label for="discMachine" style="flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)">On</label><select class="gsel" id="discMachine" style="flex:0 0 170px;max-width:none" title="Where pytest --collect-only runs: in that machine's project folder"></select><label for="discGroup" style="flex:0 0 auto;font-size:12px;font-weight:600;color:var(--muted)">Add under</label><select class="gsel" id="discGroup" style="flex:0 0 200px;max-width:none"></select><input class="search" id="discFilter" placeholder="Filter…" style="width:auto;flex:1 1 120px"></div>
     <div id="discWhere" style="font-size:12px;color:var(--faint);margin:-4px 0 8px" class="mono"></div>
     <div id="discBody" class="tree"><div class="nolog" style="padding:30px;text-align:center">Collecting…</div></div>
     <small style="color:var(--faint);display:block;margin-top:8px">Tick a file to add the whole file as one library test, or tick single tests to add each one. Anything already in the library is skipped.</small>
@@ -583,6 +609,7 @@ const I={
   server:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.75h.01M4.5 11.25h.01" stroke-width="2.2" stroke-linecap="round"/></svg>',
   opts:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h7M13 4h1M2 8h2M8 8h6M2 12h9M14 12h0"/><circle cx="11" cy="4" r="1.6"/><circle cx="6" cy="8" r="1.6"/><circle cx="12.5" cy="12" r="1.6"/></svg>',
   branch:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="4.5" cy="3.5" r="1.6"/><circle cx="4.5" cy="12.5" r="1.6"/><circle cx="11.5" cy="5.5" r="1.6"/><path d="M4.5 5.1v5.8M11.5 7.1c0 2.4-2.5 2.9-6.2 4"/></svg>',
+  search:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>',
   nolink:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 6.5a9.5 9.5 0 0 1 13 0M4 9.2a6 6 0 0 1 8 0M6.4 11.8a2.5 2.5 0 0 1 3.2 0M2.5 2.5l11 11"/></svg>',
   hourglass:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2h8M4 14h8M5 2c0 4 6 4 6 6s-6 2-6 6M11 2c0 4-6 4-6 6"/></svg>',
 };
@@ -609,10 +636,25 @@ function boardLanes(){
   return lanes;
 }
 
+// Keeping up with updates: when static/index.html changes on disk this page reloads itself (once no dialog is open,
+// so nothing typed is lost); when the running server is older than this page, a note asks for a restart.
+const PAGE_VERSION='2026.10.23.2';  // = BOARD_VERSION in server.py
+let pageStamp=null;
+const verCmp=(a,b)=>{const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);
+  for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+function checkUpdates(d){
+  if(d.page){
+    if(pageStamp==null) pageStamp=d.page;
+    else if(d.page!==pageStamp&&!dragging&&![...document.querySelectorAll('dialog')].some(x=>x.open)){location.reload();return}
+  }
+  const bv=d.board_version??d.server?.board_version;
+  if(d.server||bv) $('#staleServer').hidden=!!bv&&verCmp(bv,PAGE_VERSION)>=0;
+}
 async function refresh(force){
   try{
     const d=await api('GET','/board'+(force||S.version==null?'':'?since='+S.version));
     document.body.classList.remove('is-offline');
+    checkUpdates(d);
     if(d.unchanged) return;
     S=d; skew=d.server.now*1000-Date.now();
     if(dragging||editingLane()) pendingRender=true; else render();
@@ -691,11 +733,20 @@ function render(){
         ${cnt('running')?`<span style="color:var(--running)">${I.spin.replace('<svg','<svg width=12 height=12')}${cnt('running')} running</span>`:''}
         ${cnt('passed')?`<span style="color:var(--passed)">● ${cnt('passed')}</span>`:''}
         ${cnt('failed')?`<span style="color:var(--failed)">● ${cnt('failed')}</span>`:''}</span>
-      <span class="lane-actions">${m?`<button class="btn" style="padding:3px 8px;font-size:12px" data-act="run" title="Queue every card on ${esc(machLabel(name))}${grpSel!=='*'?' (headline '+esc(grpSel||'none')+' only)':''}">${I.play}Run lane</button>`:''}</span>`;
+      <span class="lane-actions"><button class="btn" style="padding:3px 8px;font-size:12px" data-act="clear" ${cnt('passed')+cnt('failed')?'':'disabled'} title="${cnt('passed')+cnt('failed')?`Remove the ${cnt('passed')+cnt('failed')} finished (passed and failed) card${cnt('passed')+cnt('failed')===1?'':'s'} from ${esc(machLabel(name))}${grpSel!=='*'?' (headline '+esc(grpSel||'none')+' only)':''}; their run history is kept`:`Nothing to clear: no passed or failed cards on ${esc(machLabel(name))}`}">Clear</button>${m?`<button class="btn" style="padding:3px 8px;font-size:12px" data-act="run" title="Queue every card on ${esc(machLabel(name))}${grpSel!=='*'?' (headline '+esc(grpSel||'none')+' only)':''}">${I.play}Run lane</button>`:''}</span>`;
     h.onclick=e=>{
       const a=e.target.closest('[data-act]')?.dataset.act; if(!a) return;
       if(a==='toggle'){collapsed?collapsedLanes.delete(name):collapsedLanes.add(name);try{localStorage.setItem('pb.collapsedLanes',JSON.stringify([...collapsedLanes]))}catch(e){};render()}
       if(a==='edit') openMachine(name);
+      if(a==='clear'){
+        // an older server ignores "machine" and would clear every row: wait for the restart
+        if(!$('#staleServer').hidden){toast('Restart the board server first: the running one is older than this page and would clear every row.',true);return}
+        const n=cnt('passed')+cnt('failed');
+        if(!confirm(`Remove ${n} finished card${n===1?'':'s'} from ${machLabel(name)}${grpSel!=='*'?' (headline '+(grpSel||'none')+')':''}?\nRun history stays with the library test.`)) return;
+        api('POST','/cards/clear',{statuses:['passed','failed'],machine:name,...(grpSel!=='*'?{grp:grpSel||null}:{})})
+          .then(d=>{toast(`Cleared ${d.cleared} card${d.cleared===1?'':'s'} from ${machLabel(name)}`);refresh(true)}).catch(fail);
+        return;
+      }
       if(a==='run') api('POST',`/machines/${encodeURIComponent(name)}/run`,grpSel!=='*'?{grp:grpSel||null}:{})
         .then(d=>{toast(`Queued ${d.queued} card${d.queued===1?'':'s'} on ${machLabel(name)}`);refresh(true)}).catch(fail);
     };
@@ -726,10 +777,35 @@ function render(){
 
 /* ---------------- option sets (extra pytest args per card; offered from each headline's "options =" list) */
 const allOptions=()=>(S.groups||[]).flatMap(g=>g.options||[]);
+// "-m smoke -x --foo" -> the known options in it (config order) and what's left: {known:[{label,args}], rest:'--foo'}
+function splitOptset(o,opts){
+  let rest=' '+String(o||'').trim().replace(/\s+/g,' ')+' '; const known=[];
+  for(const x of [...opts].sort((a,b)=>b.args.length-a.args.length)){
+    const i=rest.indexOf(' '+x.args+' ');
+    if(i>=0&&!known.some(k=>k.args===x.args)){known.push(x);rest=rest.slice(0,i)+rest.slice(i+x.args.length+1)}
+  }
+  known.sort((a,b)=>opts.indexOf(a)-opts.indexOf(b));
+  return {known,rest:rest.trim()};
+}
 function osLabel(o,grp){
   if(!o) return 'no extra options';
-  const hit=(grpInfo(grp)?.options||[]).find(x=>x.args===o)||allOptions().find(x=>x.args===o);
-  return hit?hit.label:o;
+  const own=grpInfo(grp)?.options||[], hit=own.find(x=>x.args===o)||allOptions().find(x=>x.args===o);
+  if(hit) return hit.label;
+  const d=splitOptset(o,own.length?own:allOptions());  // a card with several options: "Smoke + Stop at first failure"
+  return d.known.length?[...d.known.map(x=>x.label),...(d.rest?[d.rest]:[])].join(' + '):o;
+}
+// each option of the config file gets its own colour (by its place in the options lists), the same on the cards'
+// dots and in the dialog; anything else gets a colour from its text
+const OPT_HUES=[355,212,135,38,282,186,18,95,325,245,60,160];
+function optHue(args){
+  const i=[...new Set(allOptions().map(o=>o.args))].indexOf(args);
+  return i>=0?OPT_HUES[i%OPT_HUES.length]:osHue(args);
+}
+function optDots(c){
+  if(!c.optset) return '';
+  const own=grpInfo(c.grp)?.options||[], d=splitOptset(c.optset,own.length?own:allOptions());
+  const tip='Options: '+[...d.known.map(x=>x.label===x.args?x.args:`${x.label} (${x.args})`),...(d.rest?[d.rest]:[])].join(', ');
+  return `<span class="odots" title="${esc(tip)}">${d.known.map(x=>`<span class="odot" style="--th:${optHue(x.args)}"></span>`).join('')}${d.rest?'<span class="odot other"></span>':''}</span>`;
 }
 function osHue(o){let h=2166136261;for(const ch of String(o||'')){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return ((h>>>0)%360)}
 function osCompare(x,y){  // no options first, then the config file's order, then the rest alphabetically
@@ -739,11 +815,17 @@ function osCompare(x,y){  // no options first, then the config file's order, the
 }
 function optGroup(lane,m,col,o,cards,rank,mini){
   const g=document.createElement('div'); g.className='tgroup'+(o?'':' none'); g.dataset.optset=o??'';
-  const label=osLabel(o,cards[0]?.grp), hue=o?osHue(o):0;
-  if(o) g.style.setProperty('--th',hue);
+  // a group's colour is its option's (as on the cards' dots); a group with several options is neutral and shows
+  // their dots instead
+  const own=grpInfo(cards[0]?.grp)?.options||[], parts=o?splitOptset(o,own.length?own:allOptions()):{known:[],rest:''};
+  const single=parts.known.length===1&&!parts.rest, multi=!!o&&!single;
+  const label=osLabel(o,cards[0]?.grp), hue=single?optHue(parts.known[0].args):o?osHue(o):0;
+  if(o&&!multi) g.style.setProperty('--th',hue);
+  if(multi) g.classList.add('multi');
   const canQueue=m&&['backlog','scheduled','passed','failed'].includes(col);
   g.title=o?(label!==o?`${label}: ${o}`:o):'cards without extra options';
-  g.innerHTML=`<div class="tg-head"><span class="tbadge" style="--th:${hue}">${mini?esc(o?label:'none'):I.opts+esc(label)}</span>
+  const gdots=multi?optDots({optset:o,grp:cards[0]?.grp}):'';
+  g.innerHTML=`<div class="tg-head"><span class="tbadge${multi?' multi':''}" style="--th:${hue}">${gdots}${mini?esc(o?label:'none'):(multi?'':I.opts)+esc(label)}</span>
       ${!mini&&label!==o&&o?`<code class="mono" style="font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o)}</code>`:''}
       ${!mini&&cards.length>1?`<span>${cards.length}</span>`:''}
       ${canQueue?`<button class="icon trun" title="Queue ${cards.length===1?'this card':'these '+cards.length+' cards'} (${esc(label)})">${I.play}</button>`:''}</div>
@@ -760,52 +842,58 @@ function quoteProblem(line){  // same idea as the server's check: quotes must be
   let q=null;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='\\'&&q!=="'"){i++;continue}if(q){if(ch===q)q=null}else if(ch==='"'||ch==="'")q=ch}
   return q?`unclosed ${q} in “${line}”`:null;
 }
-// Which option sets to put a library test on the board with. Resolves to a list (null = a card without
-// extra options), [] for a single plain card, or null when cancelled. always=false skips the dialog when the
-// test's headline offers no options and nothing was picked for it before.
+// Which options to put a library test on the board with: ONE card, whose option set is every ticked option.
+// Resolves to the list of ticked options ([] for none; its .extra holds the extra arguments), or null when
+// cancelled. always=false skips the dialog when the test's headline offers no options and nothing was picked or
+// typed for it before. prefill: the option set of the group the test was dropped on (its options get ticked).
 const optDlg=$('#optDlg');
+const oneSet=sets=>{const j=sets.filter(Boolean).join(' ');return j?[j]:[]};  // the ticked options as one card's option set
 function askOptsets(test,lane,status,prefill,always){
   const offered=grpInfo(test.grp)?.options||[];
   let remembered=null; try{remembered=JSON.parse(test.optsets||'null')}catch(e){}
-  if(!always&&prefill===undefined&&!offered.length&&!(remembered||[]).some(Boolean)) return Promise.resolve([]);
+  if(!always&&prefill===undefined&&!offered.length&&!(remembered||[]).some(Boolean)&&!test.extra_args) return Promise.resolve([]);
   return new Promise(res=>{
     const col=COLS.find(c=>c.key===status)?.label||status;
-    const want=prefill!==undefined?[prefill===''?null:prefill]:(remembered||[]);
+    let want=[], args=test.extra_args||'';
+    if(prefill!==undefined){  // dropped on a group: tick its options; anything else in it goes to the extra arguments
+      const d=splitOptset(prefill,offered); want=d.known.map(x=>x.args); if(d.rest) args=d.rest;
+    }else for(const o of remembered||[]){  // picked last time (one option per entry, or older combined ones)
+      const d=splitOptset(o,offered); want.push(...d.known.map(x=>x.args));
+    }
     $('#odIcon').innerHTML=I.opts.replace('<svg','<svg width=18 height=18');
     $('#odHead').textContent=`Run “${test.name||test.title}” with…`;
-    $('#odIntro').innerHTML=`Adds <b>one card per ticked line</b> to <b>${esc(machLabel(lane))}</b> · ${esc(col)}. Each card adds its options to the pytest command line.`;
-    const rows=[{label:'No extra options',args:null},...offered];
-    $('#odList').innerHTML=rows.map((o,i)=>`<label class="optrow${o.args?'':' none'}" style="--th:${o.args?osHue(o.args):0}">
+    $('#odIntro').innerHTML=`Adds <b>one card</b> to <b>${esc(machLabel(lane))}</b> · ${esc(col)}. Its pytest command gets every ticked option and the extra arguments.`;
+    $('#odList').innerHTML=offered.map((o,i)=>`<label class="optrow" style="--th:${optHue(o.args)}">
         <input type="checkbox" data-i="${i}" ${want.includes(o.args)?'checked':''}><span class="sw"></span>
-        <span class="ol">${esc(o.label)}</span>${o.args&&o.label!==o.args?`<code title="${esc(o.args)}">${esc(o.args)}</code>`:'<span></span>'}</label>`).join('');
-    $('#odExtra').value=want.filter(o=>o&&!offered.some(x=>x.args===o)).join('\n');
-    $('#odHint').innerHTML=offered.length?`The list comes from <code class="mono">options =</code> under <b>${esc(test.grp)}</b> in pytest-board.ini.`
-      :test.grp?`Add an <code class="mono">options =</code> list under <b>${esc(test.grp)}</b> in pytest-board.ini to offer ready-made option sets here.`
-      :'Put the test under a headline with an <code class="mono">options =</code> list in pytest-board.ini to offer ready-made option sets here.';
+        <span class="ol">${esc(o.label)}</span>${o.label!==o.args?`<code title="${esc(o.args)}">${esc(o.args)}</code>`:'<span></span>'}</label>`).join('');
+    $('#odList').hidden=!offered.length;
+    $('#odArgs').value=args;
+    $('#odHint').innerHTML=offered.length?`The options come from <code class="mono">options =</code> under <b>${esc(test.grp)}</b> in pytest-board.ini.`
+      :test.grp?`Add an <code class="mono">options =</code> list under <b>${esc(test.grp)}</b> in pytest-board.ini to offer ready-made options here.`
+      :'Put the test under a headline with an <code class="mono">options =</code> list in pytest-board.ini to offer ready-made options here.';
     const pick=()=>{
-      const out=[];
-      $('#odList').querySelectorAll('input:checked').forEach(x=>{const a=rows[+x.dataset.i].args;if(!out.includes(a))out.push(a)});
-      const extra=$('#odExtra').value.split('\n').map(l=>l.trim().replace(/\s+/g,' ')).filter(Boolean);
-      for(const l of extra){const bad=quoteProblem(l);if(bad)return {error:bad};if(!out.includes(l))out.push(l)}
-      return {sets:out};
+      const sets=[...$('#odList').querySelectorAll('input:checked')].map(x=>offered[+x.dataset.i].args);
+      const a=$('#odArgs').value.trim(), bad=a&&quoteProblem(a);
+      return bad?{error:'Extra arguments: '+bad}:{sets,args:a};
     };
     const upd=()=>{
       const r=pick(), p=$('#odPreview'), ok=$('#odOk');
       p.classList.toggle('err',!!r.error); ok.disabled=!!r.error;
       if(r.error){p.textContent=r.error;return}
-      const n=Math.max(1,r.sets.length);
-      p.innerHTML=r.sets.length?`${n} card${n===1?'':'s'}: `+r.sets.map(o=>o?`<b>${esc(o)}</b>`:'<i>no extra options</i>').join(' · '):'1 card without extra options.';
-      ok.textContent=`Add ${n} card${n===1?'':'s'}`;
+      const cmd=[...r.sets,r.args].filter(Boolean).join(' ');
+      p.innerHTML=cmd?`1 card, run with <b class="mono">${esc(cmd)}</b>`:'1 card without extra options.';
+      ok.textContent='Add card';
     };
-    $('#odList').onchange=upd; $('#odExtra').oninput=upd;
-    optDlg.onkeydown=e=>{  // Enter adds (the form's first button would be Cancel); in the text box Ctrl+Enter
-      if(e.key!=='Enter'||(e.target.id==='odExtra'&&!(e.ctrlKey||e.metaKey))) return;
+    $('#odList').onchange=upd; $('#odArgs').oninput=upd;
+    optDlg.onkeydown=e=>{  // Enter adds (the form's first button would be Cancel)
+      if(e.key!=='Enter') return;
       e.preventDefault(); if(!$('#odOk').disabled) optDlg.close('ok');
     };
     upd(); optDlg.returnValue=''; optDlg.showModal(); $('#odOk').focus();
     optDlg.onclose=()=>{
       if(optDlg.returnValue!=='ok') return res(null);
-      const r=pick(); res(r.error?null:r.sets);
+      const r=pick(); if(r.error) return res(null);
+      r.sets.extra=r.args; res(r.sets);
     };
   });
 }
@@ -829,7 +917,7 @@ function miniCardHtml(c,idx){
     resolveBranch(c).name&&'git branch: '+resolveBranch(c).name,
     COLS.find(x=>x.key===c.status)?.label+(c.cron?' · cron '+c.cron:''),wait&&waitTip(wait),c.branch_wait&&branchWaitTip(c),c.status==='running'&&c.link&&linkTip(c,resolveMachine(c).name),
     res&&'last run: '+res].filter(Boolean).join('\n');
-  return {html:`<div class="mini-title">${esc(c.title)}</div>${st?`<div class="mini-meta">${st}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`,tip};
+  return {html:`<div class="mini-title">${optDots(c)}${esc(c.title)}</div>${st?`<div class="mini-meta">${st}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`,tip};
 }
 function cardEl(c,idx,mini){
   const el=document.createElement('div');
@@ -861,8 +949,8 @@ function cardEl(c,idx,mini){
     <div class="target mono">${esc(c.target||'(whole suite)')}${c.args?' <span style="color:var(--faint)">'+esc(c.args)+'</span>':''}</div>
     ${meta?`<div class="meta">${meta}</div>`:''}${c.status==='running'?'<div class="progress"></div>':''}`;
   const libCopy=c.test_id&&S.tests.some(t=>t.id===c.test_id), mp='';  // the swimlane shows the machine
-  const bp=branchPill(c);
-  if(c.grp||libCopy||mp||bp) el.insertAdjacentHTML('afterbegin',`<div class="card-tags">${grpTag(c.grp)}${mp}${bp}${libCopy?`<span class="from" title="Copied from the test library">${I.copy}library copy</span>`:''}</div>`);
+  const bp=branchPill(c), dots=optDots(c);
+  if(c.grp||libCopy||mp||bp||dots) el.insertAdjacentHTML('afterbegin',`<div class="card-tags">${grpTag(c.grp)}${dots}${mp}${bp}${libCopy?`<span class="from" title="Copied from the test library">${I.copy}library copy</span>`:''}</div>`);
   el.onclick=e=>{
     const a=e.target.closest('[data-act]')?.dataset.act;
     if(a==='run'){e.stopPropagation();api('POST',`/cards/${c.id}/run`).then(()=>refresh(true)).catch(fail);return}
@@ -1129,7 +1217,7 @@ $('#libSearch').oninput=renderLibrary;
 async function copyTest(t,lane,status,position,groupSet){
   // dropped on an option-set group: that set is ticked; otherwise the ones picked for this test last time
   const optsets=await askOptsets(t,lane,status,groupSet); if(optsets===null) return;
-  const body={machine:lane,status,position,optsets};
+  const body={machine:lane,status,position,optsets:oneSet(optsets),extra_args:optsets.extra,combine:true};
   if(status==='scheduled'){const s=await askSchedule({title:t.name,cron:null,run_at:null});if(!s)return;Object.assign(body,s)}
   try{
     const d=await api('POST',`/tests/${t.id}/copy`,body);
@@ -1468,7 +1556,7 @@ $('#cdRun').onclick=async()=>{
     await api('PATCH',`${base()}/${cd.id}`,formBody());
     if(cd.kind==='test'){
       const lane=resolveMachine(formBody()).name, optsets=await askOptsets(cd.data,lane,'queued',undefined,true); if(optsets===null) return;
-      const d=await api('POST',`/tests/${cd.id}/copy`,{status:'queued',optsets});
+      const d=await api('POST',`/tests/${cd.id}/copy`,{status:'queued',optsets:oneSet(optsets),extra_args:optsets.extra,combine:true});
       toast(`Added ${d.created} card${d.created===1?'':'s'} to ${machLabel(lane)} · Queued`)}
     else await api('POST',`/cards/${cd.id}/run`);
     cd.followLatest=true;cd.runId=-1;refresh(true);setTimeout(()=>loadCard(false),600);
@@ -1488,7 +1576,7 @@ $('#cdSchedule').onclick=async()=>{
     const optsets=await askOptsets(c,resolveMachine(formBody()).name,'scheduled',undefined,true); if(optsets===null) return;
     const s=await askSchedule({title:c.name,cron:null,run_at:null}); if(!s) return;
     await api('PATCH',`/tests/${c.id}`,formBody()).catch(fail);
-    await api('POST',`/tests/${c.id}/copy`,{status:'scheduled',optsets,...s}).then(d=>toast(`Scheduled ${d.created} cop${d.created===1?'y':'ies'}`)).catch(fail);
+    await api('POST',`/tests/${c.id}/copy`,{status:'scheduled',optsets:oneSet(optsets),extra_args:optsets.extra,combine:true,...s}).then(d=>toast(`Scheduled ${d.created} cop${d.created===1?'y':'ies'}`)).catch(fail);
     refresh(true); loadCard(false); return;
   }
   if(c.status==='running'){toast('Stop it first, or wait for the run to finish',true);return}
@@ -1591,20 +1679,50 @@ $('#mdDelete').onclick=async()=>{
 
 /* ---------------- discovery */
 const discDlg=$('#discDlg'); let discIds=[];
-$('#btnDiscover').onclick=()=>openDiscover(grpSel!=='*'?grpSel:(S.groups||[])[0]?.key||'');
+// "Discover" in the library: pick the machine to collect on
+const discMenu=$('#discMenu');
+function closeDiscMenu(focus){discMenu.hidden=true;$('#btnDiscover').setAttribute('aria-expanded','false');if(focus)$('#btnDiscover').focus()}
+$('#btnDiscover').onclick=e=>{
+  e.stopPropagation();
+  if(!discMenu.hidden) return closeDiscMenu();
+  discMenu.innerHTML='<div class="mh">Discover tests on</div>'+(S.machines||[]).map(m=>{
+    const local=m.name==='local', st=local?'online':(m.status?.state||'unknown');
+    const where=local?(S.server?.root||m.host):`${m.user?m.user+'@':''}${m.host}:${m.workdir||'~'}`;
+    return `<button class="mi st-${esc(st)}" role="menuitem" data-m="${esc(m.name)}" title="${esc(st==='offline'?'currently unreachable':where)}"><span class="st"></span><span>${esc(local?'This server':m.name)}</span><span class="where">${esc(where)}</span></button>`}).join('');
+  discMenu.hidden=false; $('#btnDiscover').setAttribute('aria-expanded','true'); discMenu.querySelector('.mi')?.focus();
+};
+discMenu.onclick=e=>{const b=e.target.closest('[data-m]');if(!b)return;closeDiscMenu();discoverOn(b.dataset.m)};
+discMenu.onkeydown=e=>{
+  const items=[...discMenu.querySelectorAll('.mi')], i=items.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();items[(i+(e.key==='ArrowDown'?1:items.length-1))%items.length]?.focus()}
+  if(e.key==='Escape'){e.preventDefault();closeDiscMenu(true)}
+  if(e.key==='Tab') closeDiscMenu();
+};
+document.addEventListener('click',e=>{if(!discMenu.hidden&&!e.target.closest('.disc-wrap'))closeDiscMenu()});
 $('#discGroup').onchange=()=>runDiscover();
-function openDiscover(grp){
+$('#discMachine').onchange=()=>runDiscover();
+// grp: the headline the tests are added under; machine: where to collect (default: the headline's machine)
+function openDiscover(grp,machine){
   groupOptions($('#discGroup'),grp||''); $('#discFilter').value='';
+  const ms=(S.machines||[]).filter(m=>m.name!=='local'), sel=$('#discMachine');
+  sel.innerHTML=`<option value="local">This server</option>`+ms.map(m=>`<option value="${esc(m.name)}">${esc(m.name)}${m.status?.state==='offline'?' · offline':''}</option>`).join('');
+  const want=machine||resolveMachine({grp}).name;
+  sel.value=[...sel.options].some(o=>o.value===want)?want:'local';
   discDlg.showModal(); runDiscover();
+}
+// Discover on one machine: under a headline that runs there (the selected one, else the first such)
+function discoverOn(name){
+  const gs=S.groups||[], g=grpSel!=='*'?grpSel:(gs.find(x=>(x.machine||'local')===name)||gs[0])?.key||'';
+  openDiscover(g,name);
 }
 let discSeq=0;
 async function runDiscover(){
-  const grp=$('#discGroup').value, seq=++discSeq; discIds=[];
+  const grp=$('#discGroup').value, mach=$('#discMachine').value, seq=++discSeq; discIds=[];
   $('#discWhere').textContent='';
-  $('#discBody').innerHTML='<div style="padding:30px;text-align:center;color:var(--faint)">Running pytest --collect-only…</div>'; updDisc();
+  $('#discBody').innerHTML=`<div style="padding:30px;text-align:center;color:var(--faint)">Running pytest --collect-only${mach==='local'?'':' on '+esc(mach)}…</div>`; updDisc();
   try{
-    const d=await api('GET','/discover?grp='+encodeURIComponent(grp)); if(seq!==discSeq) return; discIds=d.ids;
-    $('#discWhere').textContent=`in ${d.cwd}`;
+    const d=await api('GET','/discover?grp='+encodeURIComponent(grp)+'&machine='+encodeURIComponent(mach)); if(seq!==discSeq) return; discIds=d.ids||[];
+    $('#discWhere').textContent=d.cwd?`in ${d.cwd}${d.branch?' · branch '+d.branch:''}`:'';
     if(d.error&&!d.ids.length){$('#discBody').innerHTML=`<pre class="log" style="margin:0;max-height:40vh">${esc(d.error)}</pre>`;return}
     if(d.error) toast('Collection had errors; showing what was collected',true);
     drawDisc();
@@ -1630,12 +1748,12 @@ function discTargets(){
   $('#discBody').querySelectorAll('.file').forEach(fd=>{const fi=fd.querySelector('[data-file]');if(fi.checked)out.push(fi.dataset.file);else fd.querySelectorAll('[data-id]:checked').forEach(i=>out.push(i.dataset.id))});
   return out;
 }
-function updDisc(){const n=discTargets().length, g=$('#discGroup').value;
-  $('#discCount').textContent=n?`${n} test${n===1?'':'s'} will be added under ${g||'no headline'}`:'';$('#discAdd').disabled=!n}
+function updDisc(){const n=discTargets().length, g=$('#discGroup').value, mach=$('#discMachine').value, def=resolveMachine({grp:g}).name;
+  $('#discCount').textContent=n?`${n} test${n===1?'':'s'} will be added under ${g||'no headline'}${mach!==def?`, running on ${machLabel(mach)}`:''}`:'';$('#discAdd').disabled=!n}
 $('#discAdd').textContent='Add to library';
 $('#discAdd').onclick=async()=>{
-  const targets=discTargets(), grp=$('#discGroup').value||null;
-  try{const d=await api('POST','/tests/bulk',{targets,grp});
+  const targets=discTargets(), grp=$('#discGroup').value||null, machine=$('#discMachine').value;
+  try{const d=await api('POST','/tests/bulk',{targets,grp,machine});
     toast(`Added ${d.created} test(s) under ${grp||'no headline'}${d.skipped?` · ${d.skipped} already there`:''}`);discDlg.close();refresh(true)}catch(e){toast(e.message,true)}
 };
 

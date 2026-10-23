@@ -24,9 +24,9 @@ If the test's headline offers **option sets**, dropping it on the board first as
 
 You can drop the same library test onto the board as often as you like, for example a nightly copy on one machine and an ad-hoc run on another. Editing a copy only changes that copy.
 
-Running / Passed / Failed are set by the server. A repeating (cron) card goes back to **Scheduled** after each run, and the badge shows the last result. **Clear** on the Passed/Failed headers removes finished copies from the board. Their run history stays with the library test: open a library test to see every run of every copy, including which machine it ran on.
+Running / Passed / Failed are set by the server. A repeating (cron) card goes back to **Scheduled** after each run, and the badge shows the last result. **Clear** on the Passed/Failed headers removes finished copies from the board; **Clear** on a machine's row removes just that row's passed and failed cards (only the selected headline's when the headline menu is set). Their run history stays with the library test: open a library test to see every run of every copy, including which machine it ran on.
 
-Other features: **Run lane** queues every card on that machine (only the selected headline's when the headline menu is set). **Discover** (in the library, or the magnifier on a headline) runs `pytest --collect-only` in that headline's folder and adds files or single tests under it, skipping ones already there. The **All headlines** menu in the top bar narrows both the board and the library to one headline. Clicking a card shows its run history and a **live log** while it runs, with the junit.xml for each run. You can also stop, set timeouts and filter cards.
+Other features: **Run lane** queues every card on that machine (only the selected headline's when the headline menu is set). **Discover** (the button in the library, which asks which machine; or the magnifier on a headline, which uses the headline's machine) runs `pytest --collect-only` on a machine and adds files or single tests to the library, skipping ones already there. The dialog's **On** menu changes the machine: on a machine it runs over ssh in the machine's project folder (plus the headline's `dir`), with its pytest command and environment, on whatever branch is checked out there (shown in the dialog; Discover never switches branches). Tests found on a machine other than their headline's get that machine set. The **All headlines** menu in the top bar narrows both the board and the library to one headline. Clicking a card shows its run history and a **live log** while it runs, with the junit.xml for each run. You can also stop, set timeouts and filter cards.
 
 ## Option sets
 
@@ -43,9 +43,11 @@ options =
     -v
 ```
 
-When you drop a library test under that headline on the board, a dialog lists these with checkboxes, plus **No extra options**, plus a box for more option sets (one per line, for one-offs). You get **one card per ticked line**, and each card's runs get its option set added to the pytest command line. The dialog remembers what you picked for each test last time. A test whose headline lists no options goes straight onto the board as one card, as before; **Run a copy now** / **Schedule a copy…** in its dialog still let you type option sets.
+When you drop a library test under that headline on the board, a dialog lists these with checkboxes, plus an **Extra arguments** line. You get **one card**: its runs get every ticked option, plus the extra arguments as you typed them, on the pytest command line. Ticking *Smoke only* and *-x* and typing `--set_temperature 0 10 20` gives one card that runs `pytest … --set_temperature 0 10 20 -m smoke -x`. The dialog remembers what you ticked and typed for each test last time. A test whose headline lists no options goes straight onto the board as one card, as before; **Run a copy now** / **Schedule a copy…** in its dialog still open the dialog, so you can type extra arguments.
 
-- **On the board:** inside each column of a machine's lane (Backlog, Queued, Running, …) cards are **grouped by option set**, labelled with the label from the config file (or the options themselves). When a column holds two or more option sets, the groups sit **side by side** with compact cards (title plus one status line: queue position, elapsed time or result); hover a compact card for its details, click it to open it. Cards without extra options get a "none" group when a column has both.
+- **Extra arguments** go into the card's own *Extra pytest args* (so they show on the card and can be edited there later); the ticked options become the card's **option set**. An option that takes several values needs `nargs="+"` in its `pytest_addoption` (see below); otherwise pytest reads `10` and `20` as test paths.
+- **Coloured dots:** every option in `options =` gets its own colour, and each card on the board shows one dot per option it runs with (hover the dots for their names). The checkboxes in the dialog and the option-set groups use the same colours; a group with several options shows their dots.
+- **On the board:** inside each column of a machine's lane (Backlog, Queued, Running, …) cards are **grouped by option set**, labelled with the label from the config file, *Smoke only + Stop at first failure* for a card with several (or the options themselves). When a column holds two or more option sets, the groups sit **side by side** with compact cards (title plus one status line: queue position, elapsed time or result); hover a compact card for its details, click it to open it. Cards without extra options get a "none" group when a column has both.
 - **Changing a card's option set:** drop it on another group (in any column), or edit **Option set** in the card's dialog. Dropping a library test on a group ticks that group's option set in the dialog.
 - The ▶ on a group in Backlog, Scheduled, Passed or Failed queues just those cards, and the run history shows each run's options.
 - **Options your own tests define** (like `--device=A`) need a `pytest_addoption` in a `conftest.py` that pytest loads at start-up: in the folder the tests run in, or at the project root. Otherwise pytest stops at once and the card shows *pytest usage error*:
@@ -56,6 +58,7 @@ When you drop a library test under that headline on the board, a dialog lists th
 
   def pytest_addoption(parser):
       parser.addoption("--device", default=None, help="device to test against")
+      parser.addoption("--set_temperature", nargs="+", type=int, default=[], help="temperatures to test at")
 
   @pytest.fixture
   def device(request):
@@ -249,7 +252,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now pytest-board
 
 The board survives restarts. Runs on machines go on while it's stopped and are picked up again when it starts; runs on this server that were in progress are marked *interrupted*.
 
-**Upgrading from an earlier version:** replace the files, add your `pytest-board.ini`, and restart. The existing `board.db` is upgraded automatically and your cards and run history are kept. Existing library tests appear under "No headline"; open one and pick a headline to move it. Custom swimlanes (Smoke, Regression, …) from older versions are gone: every card moves to the row of the machine it runs on.
+**Upgrading from an earlier version:** replace the files, add your `pytest-board.ini`, and restart. An open board page reloads itself when its files change (once no dialog is open), and shows *board server needs a restart* while the running server is older than the page. The existing `board.db` is upgraded automatically and your cards and run history are kept. Existing library tests appear under "No headline"; open one and pick a headline to move it. Custom swimlanes (Smoke, Regression, …) from older versions are gone: every card moves to the row of the machine it runs on.
 
 ## Running on Windows
 
@@ -275,6 +278,6 @@ Differences from Linux:
 
 - Cron is evaluated in the **server's** local time zone. Standard 5 fields plus `@hourly`, `@daily`, `@weekly` and `@monthly`.
 - Each run sets `PYTEST_BOARD_RUN_ID`, `PYTEST_BOARD_GROUP` (the headline) and, on a machine, `PYTEST_BOARD_MACHINE` in the environment, which is handy for naming reports or screenshots.
-- **Discover** collects tests on this server (in `--root`), so keep a checkout of the tests on the board server too, or use `sync = yes`.
+- **Discover** on *This server* collects in `--root`; on a machine it collects in that machine's own checkout, so the board server needs no copy of the tests.
 - `pytest-xdist` works as usual: put `-n 4` in the card's extra args.
 - API: everything the UI does is plain JSON under `/api/…` (see `App.__init__` in `server.py`). For example, from CI: `curl -u x:TOKEN -X POST http://box:8765/api/machines/lab-a/run` (use `local` for this server).
