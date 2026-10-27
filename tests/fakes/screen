@@ -1,0 +1,20 @@
+#!/bin/sh
+# A stand-in for screen in the tests (only what the board uses): -dmS NAME CMD..., -S NAME -X quit, -x NAME, -ls
+SD="$HOME/.fakescreen"; mkdir -p "$SD"
+case "$1" in
+  -dmS) n=$2; shift 2
+        setsid "$@" </dev/null >/dev/null 2>&1 & echo $! > "$SD/$n"; echo "$(date +%T) start $n" >> "$SD/log"; exit 0;;
+  -S)   n=$2
+        if [ "$3" = -X ] && [ "$4" = quit ]; then
+          P=$(cat "$SD/$n" 2>/dev/null); [ -n "$P" ] && kill -s HUP -- "-$P" 2>/dev/null
+          rm -f "$SD/$n"; echo "$(date +%T) quit $n" >> "$SD/log"; exit 0
+        fi; exit 1;;
+  -x|-r) n=$2; P=$(cat "$SD/$n" 2>/dev/null)
+        if [ -n "$P" ] && kill -0 "$P" 2>/dev/null; then
+          echo "[fake screen] attached to $n"; while kill -0 "$P" 2>/dev/null; do sleep 0.3; done
+          echo "[screen is terminating]"; exit 0
+        fi
+        echo "There is no screen to be attached matching $n."; exit 1;;
+  -ls)  ls "$SD"; exit 0;;
+esac
+exit 1

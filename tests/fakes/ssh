@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""A stand-in for ssh in the tests: runs the "remote" command right here, as if logged in to the machine.
+
+FAKE_SSH_ROOT (set by the tests) holds
+  home/      the machine's HOME (the board keeps its run folders in ~/.pytest-board/runs there)
+  netdown    while this file exists the network is down: new connections fail after a short delay, and open
+             connections are cut (exit code 255), like a real outage
+  ssh.log    one line per connection
+Hosts whose name starts with "nosc" have no screen, so runs there use the background-process fallback.
+"""
+import os
+import signal
+import subprocess
+import sys
+import threading
+import time
+
+ROOT = os.environ["FAKE_SSH_ROOT"]
+FAKES = os.path.dirname(os.path.abspath(__file__))
+NET = os.path.join(ROOT, "netdown")
+
+args, tty, i = sys.argv[1:], False, 0
+while i < len(args):  # skip ssh's own options: -T, -o X=Y, -p PORT, -i KEY, ...
+    a = args[i]
+    if a == "-tt":
+        tty = True
+        i += 1
+    elif a in ("-o", "-p", "-i", "-l", "-F"):
+        i += 2
+    elif a.startswith("-"):
+        i += 1
+    else:
+        break
+host, cmd = args[i], " ".join(args[i + 1:])
+host = host.split("@")[-1]
+# like a real ssh login, the remote side starts with a fresh environment, not the board's (so nothing the board has
+# in its own environment, like PYTEST_BOARD_TOKEN, can reach the tests by accident)
+env = {k: v for k, v in os.environ.items() if k in ("PATH", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR")}
+env.update(HOME=os.path.join(ROOT, "home"), USER="fm", LOGNAME="fm", SHELL="/bin/sh")
+
+
+def path_without_screen(path):
+    """PATH with no screen on it: the fakes folder is left out, and any other folder that has a real screen is
+    replaced by a copy made of links to everything in it except screen."""
+    out = []
+    for d in path.split(os.pathsep):
+        if not d or os.path.abspath(d) == FAKES:
+            continue
+        if os.path.exists(os.path.join(d, "screen")):
+            shadow = os.path.join(ROOT, "noscreen", d.strip("/").replace("/", "_") or "root")
+            if not os.path.isdir(shadow):
+                os.makedirs(shadow + ".tmp", exist_ok=True)
+                for name in os.listdir(d):
+                    if name != "screen":
+                        try:
+                            os.symlink(os.path.join(d, name), os.path.join(shadow + ".tmp", name))
+                        except OSError:
+                            pass
+                try:
+                    os.rename(shadow + ".tmp", shadow)
+                except OSError:
+                    pass  # made by another connection at the same time
+            d = shadow
+        out.append(d)
+    return os.pathsep.join(out)
+
+
+if host.startswith("nosc"):
+    env["PATH"] = path_without_screen(env["PATH"])
+with open(os.path.join(ROOT, "ssh.log"), "a") as f:
+    f.write(f"{time.strftime('%H:%M:%S')} {host} tty={int(tty)} "
+            f"net={'down' if os.path.exists(NET) else 'up'} {cmd[:60]!r}\n")
+if os.path.exists(NET):
+    time.sleep(float(os.environ.get("FAKE_CONNECT_DELAY", "0.5")))
+    sys.stderr.write(f"ssh: connect to host {host} port 22: Connection timed out\n")
+    sys.exit(255)
+if tty:  # an interactive terminal (Open shell, Attach)
+    os.execvpe("sh", ["sh", "-c", cmd], env)
+
+p = subprocess.Popen(["sh", "-c", cmd], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                     env=env, start_new_session=True)
+
+
+def die(*_):
+    try:
+        os.killpg(p.pid, signal.SIGKILL)
+    except OSError:
+        pass
+    os._exit(255)
+
+
+for sig in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+    signal.signal(sig, die)
+
+
+def copy(src, dst, close):
+    try:
+        while True:
+            b = os.read(src.fileno(), 65536)
+            if not b:
+                break
+            os.write(dst.fileno(), b)
+    except OSError:
+        pass
+    if close:
+        try:
+            dst.close()
+        except OSError:
+            pass
+
+
+threading.Thread(target=copy, args=(sys.stdin, p.stdin, True), daemon=True).start()
+pumps = [threading.Thread(target=copy, args=(s, d, False), daemon=True)
+         for s, d in ((p.stdout, sys.stdout), (p.stderr, sys.stderr))]
+for t in pumps:
+    t.start()
+while True:
+    try:
+        rc = p.wait(timeout=0.2)
+        break
+    except subprocess.TimeoutExpired:
+        pass
+    if os.path.exists(NET):
+        sys.stderr.write("client_loop: send disconnect: Broken pipe\n")
+        sys.stderr.flush()
+        die()
+for t in pumps:
+    t.join(2)
+sys.exit(rc if rc >= 0 else 255)

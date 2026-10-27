@@ -257,7 +257,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now pytest-board
 
 The board survives restarts. Runs on machines go on while it's stopped and are picked up again when it starts.
 
-**Upgrading from an earlier version:** replace the files, add your `pytest-board.ini`, and restart. An open board page reloads itself when its files change (once no dialog is open), and shows *board server needs a restart* while the running server is older than the page. The existing `board.db` is upgraded automatically and your cards and run history are kept. Existing library tests appear under "No headline"; open one and pick a headline to move it. Custom swimlanes (Smoke, Regression, …) from older versions are gone: every card moves to the row of the machine it runs on. Cards that ran on "This server" lose that choice: they follow their headline's machine, or wait in the *No machine* row. Library tests lose the machine they had: copies already on the board keep theirs.
+**Upgrading from an earlier version:** replace the files (`server.py`, the `pytest_board/` folder next to it, and `static/`), add your `pytest-board.ini`, and restart. An open board page reloads itself when its files change (once no dialog is open), and shows *board server needs a restart* while the running server is older than the page. The existing `board.db` is upgraded automatically and your cards and run history are kept. Existing library tests appear under "No headline"; open one and pick a headline to move it. Custom swimlanes (Smoke, Regression, …) from older versions are gone: every card moves to the row of the machine it runs on. Cards that ran on "This server" lose that choice: they follow their headline's machine, or wait in the *No machine* row. Library tests lose the machine they had: copies already on the board keep theirs.
 
 ## Running on Windows
 
@@ -277,10 +277,43 @@ Differences from Linux:
 - **Open shell** works through ssh's own pipes: login must be key-based (it can't show a password prompt), and the terminal keeps the size it was opened with.
 - **Starting with Windows:** use Task Scheduler instead of the systemd file. *Create Task* → "Run whether user is logged on or not", trigger *At startup*, action *Start a program*: `py`, arguments `C:\pytest-board\server.py --root C:\work\my-project --token change-me`. The task's account is the one whose `.ssh` keys are used.
 
+## How the code is laid out
+
+`server.py` only starts the board; the board itself is the `pytest_board/` package next to it (copy both, plus
+`static/`, when you install it somewhere else). Still standard library only.
+
+| Module | What's in it |
+|---|---|
+| `cli.py` | the command line (`--root`, `--port`, …) and start-up |
+| `web.py` | the HTTP server: login, routing to the API, serving the page |
+| `api.py` | `App`: every action of the page, one method per API route |
+| `runner.py` | `Runner`: the queue (which card runs next, and where), the scheduler, a run from start to result |
+| `ssh.py`, `remote.py`, `sync.py`, `health.py` | the parts of `Runner` that talk to machines: ssh command lines and env layers; runs that go on on the machine by themselves (start, follow, reconnect, collect, tidy, Discover); copying the project; machine checks |
+| `config.py` | `pytest-board.ini`: headlines and `[machine:NAME]` sections |
+| `machines.py` | the machines from the config file plus the ones added in the UI |
+| `store.py` | the SQLite database: schema and upgrades of older `board.db` files |
+| `model.py`, `envfiles.py`, `cron.py`, `system.py` | rules for values (machines, branches, option sets), .env files, cron, OS details |
+| `shells.py` | the terminals of **Open shell** and **Attach** |
+
+The page is one file, `static/index.html`. `BOARD_VERSION` (in `pytest_board/__init__.py`) and `PAGE_VERSION` (in
+the page) go up together whenever the page needs a newer server.
+
+### Tests
+
+```bash
+venv/bin/python -m pytest tests        # about a minute
+```
+
+The tests start real board servers on free ports, with stand-ins for the machines (`tests/fakes/`): an ssh that runs
+the "remote" command locally (and can simulate a network outage), a `screen`, and a pytest that reports what it was
+given. They cover the config file, the API's rules (rows, bindings, cards without a machine), and real runs: pass and
+fail outcomes, env layers, one test at a time per machine, Stop, a network drop and a board restart during a run, git
+branches, and scheduling. They need Linux or macOS with `git`; `node`, if installed, also checks the page's script.
+
 ## Notes
 
 - Cron is evaluated in the **server's** local time zone. Standard 5 fields plus `@hourly`, `@daily`, `@weekly` and `@monthly`.
 - Each run sets `PYTEST_BOARD_RUN_ID`, `PYTEST_BOARD_GROUP` (the headline) and `PYTEST_BOARD_MACHINE` in the environment, which is handy for naming reports or screenshots.
 - **Discover** collects on a machine, in its own checkout, so the board server needs no copy of the tests.
 - `pytest-xdist` works as usual: put `-n 4` in the card's extra args.
-- API: everything the UI does is plain JSON under `/api/…` (see `App.__init__` in `server.py`). For example, from CI: `curl -u x:TOKEN -X POST http://box:8765/api/machines/lab-a/run`.
+- API: everything the UI does is plain JSON under `/api/…` (the routes are in `App.__init__`, in `pytest_board/api.py`). For example, from CI: `curl -u x:TOKEN -X POST http://box:8765/api/machines/lab-a/run`.
