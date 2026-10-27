@@ -23,7 +23,9 @@ from pytest_board.cli import main  # noqa: E402
 from pytest_board.config import Groups  # noqa: E402,F401
 from pytest_board.cron import Cron  # noqa: E402,F401
 from pytest_board.envfiles import parse_env_file, parse_env_lines, read_env_file  # noqa: E402,F401
-from pytest_board.model import normalize_branch, normalize_machine, normalize_optset, parse_optsets  # noqa: E402,F401
+from pytest_board import optscan  # noqa: E402,F401
+from pytest_board.model import (  # noqa: E402,F401
+    filled_optset, normalize_branch, normalize_machine, normalize_optset, parse_optsets)
 
 if __name__ == "__main__":
     main()

@@ -84,6 +84,26 @@ def test_stop(board):
     assert board.last_run(c)["outcome"] == "cancelled"
 
 
+def test_clear_queued_and_running(board):
+    """Clear on the Queued and Running columns: queued cards just go; running ones are stopped first."""
+    running, queued = board.new_card("Quick"), board.new_card("Quick")
+    for c in (running, queued):
+        board.api("PATCH", f"/cards/{c}", {"env": "TICKS=40"})
+    board.api("POST", f"/cards/{running}/run")
+    board.until(lambda: ticks(board.run_log(running)), "the run to start")
+    board.api("POST", f"/cards/{queued}/run")  # pi is busy: it waits
+    assert board.card(queued)["status"] == "queued"
+    run = board.last_run(running)["id"]
+    assert board.api("POST", "/cards/clear", {"statuses": ["queued"]})["cleared"] == 1
+    assert board.card(running)["status"] == "running"
+    assert board.api("POST", "/cards/clear", {"statuses": ["running"]})["cleared"] == 1
+    assert {c["id"] for c in board.api("GET", "/board")["cards"]} & {running, queued} == set()
+    def outcome():
+        return next(r for r in board.api("GET", f"/tests/{board.test_id('Quick')}")["runs"] if r["id"] == run)["outcome"]
+    assert board.until(lambda: outcome() == "cancelled", "the run to end as cancelled")
+    assert len(ticks(board.api("GET", f"/runs/{run}/log")["text"])) < 40
+
+
 def test_network_drop_doesnt_end_the_run(board):
     c = board.new_card("Quick")
     board.api("PATCH", f"/cards/{c}", {"env": "TICKS=10"})
@@ -131,6 +151,21 @@ def test_git_branch(git_work, board):
     board.wait_status(c, "failed")
     assert board.last_run(c)["outcome"] == "checkout-failed"
     assert "isn't on origin" in board.run_log(c)
+
+
+def test_branch_given_when_queued(git_work, board):
+    """Moving a card into Queued (or copying a library test there) can set its branch on the way."""
+    d = board.api("GET", "/branches?grp=SYS&machine=pi")
+    assert (d["git"], d["branches"], d["current"], d["error"]) == (True, ["feature/x", "main"], "main", None)
+    c = board.new_card("Quick")
+    board.api("POST", f"/cards/{c}/move", {"status": "queued", "branch": "feature/x"})
+    assert board.wait_status(c, "passed", "failed")["branch"] == "feature/x"
+    assert "BRANCH: feature/x | MARK: feature" in board.run_log(c)
+    board.api("POST", f"/cards/{c}/move", {"status": "queued", "branch": None})  # back to the headline's (none)
+    assert board.wait_status(c, "passed", "failed")["branch"] is None
+    c2 = board.api("POST", f"/tests/{board.test_id('Quick')}/copy", {"status": "queued", "branch": "feature/x"})["id"]
+    board.wait_status(c2, "passed", "failed")
+    assert "BRANCH: feature/x | MARK: feature" in board.run_log(c2)
 
 
 def test_headline_branch(git_work, board):

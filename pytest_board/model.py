@@ -40,6 +40,20 @@ def normalize_branch(v):
     return t
 
 
+# an option that takes a value has a <placeholder> where the value goes (headline options in the config file:
+# Temperature | --set_temperature <degrees>); the page fills it in with what was typed
+OPTION_VALUE_RX = re.compile(r"<([^<>\s]+)>")
+
+
+def filled_optset(v):
+    """normalize_optset for a card's option set, which can't still have an option's <value> in it."""
+    t = normalize_optset(v)
+    hole = OPTION_VALUE_RX.search(t or "")
+    if hole:
+        raise ValueError(f"type a value for {hole.group(0)} (option set {t!r})")
+    return t
+
+
 def parse_optsets(values):
     """A list of option sets (None or '' = a card without extra options), or text with one set per line ->
     normalized, in the given order, without repeats."""
@@ -47,7 +61,7 @@ def parse_optsets(values):
         values = [ln for ln in values.splitlines() if ln.strip()]
     out = []
     for v in values or []:
-        t = normalize_optset(v)
+        t = filled_optset(v)
         if t not in out:
             out.append(t)
     return out

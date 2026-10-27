@@ -26,7 +26,7 @@ Passed and Failed list the most recently finished cards first and **stack the ca
 
 A cell with five or more entries (a stack counts as one) shows the first three and a **+N more** button that shows the rest. **Show all** on the machine's row (it appears when any cell in the row is folded) unfolds the whole row, and **Show less** folds it again. Unfolded rows stay unfolded after a reload (in that browser).
 
-Running / Passed / Failed are set by the server. A repeating (cron) card goes back to **Scheduled** after each run, and the badge shows the last result. **Clear** on the Passed/Failed headers removes finished copies from the board; **Clear** on a machine's row removes just that row's passed and failed cards (only the selected headline's when the headline menu is set). Their run history stays with the library test: open a library test to see every run of every copy, including which machine it ran on.
+Running / Passed / Failed are set by the server. A repeating (cron) card goes back to **Scheduled** after each run, and the badge shows the last result. **Clear** on a column header (every column has one, in the same place) removes that column's cards from the board, on every row (only the selected headline's when the headline menu is set); on Running it stops those tests first, and their runs end as cancelled. **Clear** on a machine's row removes just that row's passed and failed cards (only the selected headline's when the headline menu is set). Their run history stays with the library test: open a library test to see every run of every copy, including which machine it ran on.
 
 Other features: **Run lane** queues every card on that machine (only the selected headline's when the headline menu is set). **Discover** (the button in the library, which asks which machine; or the magnifier on a headline, which uses the headline's machine) runs `pytest --collect-only` on a machine and adds files or single tests to the library, skipping ones already there. The dialog's **On** menu changes the machine: on a machine it runs over ssh in the machine's project folder (plus the headline's `dir`), with its pytest command and environment, on whatever branch is checked out there (shown in the dialog; Discover never switches branches). The machine is only where they are collected: the new library tests don't remember it. The **All headlines** menu in the top bar narrows both the board and the library to one headline. Clicking a card shows its run history and a **live log** while it runs, with the junit.xml for each run. You can also stop, set timeouts and filter cards.
 
@@ -42,13 +42,22 @@ options =
     Slow tests | -m slow --maxfail=3
     Stop at first failure | -x
     Only last failures | --lf
+    Temperature | --set_temperature <degrees>
+    Device | --device=<name>
     -v
 ```
 
 When you drop a library test under that headline on the board, a dialog lists these with checkboxes, plus an **Extra arguments** line. You get **one card**: its runs get every ticked option, plus the extra arguments as you typed them, on the pytest command line. Ticking *Smoke only* and *-x* and typing `--set_temperature 0 10 20` gives one card that runs `pytest … --set_temperature 0 10 20 -m smoke -x`. The dialog remembers what you ticked and typed for each test last time. A test whose headline lists no options goes straight onto the board as one card, as before; **Run a copy now** / **Schedule a copy…** in its dialog still open the dialog, so you can type extra arguments.
 
+- **Options from `conftest.py`:** the board also offers the options your project declares itself, in `pytest_addoption()` (`parser.addoption("--device", ...)`), without listing them in `options =`. It reads the `conftest.py` files pytest would load for the headline on the machine the card goes to: in the headline's folder, up to three levels below it (not in hidden folders or virtualenvs), and the folders above it up to the machine's `workdir`. For a machine with `sync = yes`, or a headline without a machine, it reads the project on the board's server instead. The files are only read (with Python's `ast` module), never imported or run. They show in the dialog under **From conftest.py**, labelled with the start of their `help` text, which you can hover for the whole text:
+  - `action="store_true"` and other options without a value (`--fail`) are a checkbox;
+  - options with one value (`default="A", metavar="NAME"`) become `--device=<name>`, with a box that shows the default and offers the `choices`, if there are any;
+  - options with several values (`nargs="+"`) become `--set_temperature <degrees>`.
+
+  An option already in `options =` (the same arguments, or a `<placeholder>` form of the same option) isn't offered twice. The board looks when it starts and when a headline is new or its `dir` changes. It looks again when the dialog opens if its last look is more than two minutes old or was on another machine, and when you click **Look again** under the list. What it found is kept in its database, so the cards' dots work after a restart. Only calls written out with plain values are seen: `addoption(*names)` or a name built at run time isn't. Turn it off for a headline with `conftest_options = no`.
+- **Options that take a value:** put a `<placeholder>` where the value goes, like `Temperature | --set_temperature <degrees>` above. In the dialog that option gets a small box: type `0` and the card runs with `--set_temperature 0`, and shows the option's coloured dot with **0** next to it. Typing in the box ticks the option; an empty box unticks it. On its own (`--set_temperature <degrees>`) the value can be several words, `0 10 20` (the option needs `nargs="+"`, below); stuck to the option (`--device=<name>`) it is one word, and the board quotes it if you type spaces. To pass one value that has spaces to an option on its own, quote it: `"a or b"`. One `<placeholder>` per option; a card can't be added while a box of a ticked option is empty.
 - **Extra arguments** go into the card's own *Extra pytest args* (so they show on the card and can be edited there later); the ticked options become the card's **option set**. An option that takes several values needs `nargs="+"` in its `pytest_addoption` (see below); otherwise pytest reads `10` and `20` as test paths.
-- **On the board:** each card shows **one coloured dot per option** it runs with (hover the dots for their names). Every option in `options =` has its own colour, the same as its checkbox in the dialog. Cards with different options sit together in the same columns.
+- **On the board:** each card shows **one coloured dot per option** it runs with, with the value next to the dot for options that take one (hover the dots for their names and the full arguments). Every option in `options =` has its own colour, the same as its checkbox in the dialog. Cards with different options sit together in the same columns.
 - **Changing a card's option set:** edit **Option set** in the card's dialog. The run history shows each run's options.
 - **Options your own tests define** (like `--device=A`) need a `pytest_addoption` in a `conftest.py` that pytest loads at start-up: in the folder the tests run in, or at the project root. Otherwise pytest stops at once and the card shows *pytest usage error*:
 
@@ -103,6 +112,8 @@ The folder is the machine's `workdir`. It stays on that branch afterwards. The l
 
 **Where a branch comes from:** the card's own branch, else its headline's `branch =` in pytest-board.ini, else none. With none, pytest runs on whatever is checked out. The field is on cards only: library tests have none, and a copy dragged onto the board starts with its headline's branch (shown dashed on the card) until you set its own.
 
+**Picking the branch as you move a card:** putting a card into **Queued** asks for its branch in a small dialog, prefilled with the card's own branch. Press Enter to keep it, or leave the box empty for the headline's branch. Putting it into **Scheduled** asks in the schedule dialog, and a library test dropped into Queued gets the box in its option dialog. The box suggests the branches the machine's project folder knows (as of its last `git fetch`; the run fetches first) and says which one is checked out there now. It asks every time, also when you move a queued card to another machine's Queued; if the project folder there isn't a git checkout, the box says so (a branch would make the run stop with *git checkout failed*). Rearranging cards within one machine's Queued, moving into Backlog, and **Run now** don't ask.
+
 **Runs switch the project folder itself,** so the branch a run checks out stays checked out there afterwards. A machine runs one test at a time, so runs never get in each other's way: the next card simply checks out its own branch (or, with none, uses the folder as it is).
 
 **The run doesn't start** (*git checkout failed*, with the reason in the log) when:
@@ -144,7 +155,7 @@ Relative `env_file` paths start at the folder of pytest-board.ini. When the same
 
 ## Machines (remote execution over ssh)
 
-**Adding machines:** add them with **Add** in the Machines column, or as `[machine:NAME]` sections in `pytest-board.ini`. To add a machine like one you already have, pick it under **Copy settings from** in the Add dialog, or press **Duplicate** in that machine's dialog: everything is copied except the name and the host. Env values of config-file machines, which the browser never sees, are copied on the server. Config-file machines show a *config* badge and are edited in the file. `pytest-board.example.ini` documents every key.
+**Adding machines:** **+ Add** in the Machines column writes a `[machine:NAME]` section at the end of `pytest-board.ini` (the file is created if there is none), or you write the section yourself. Either way the machine shows a *config* badge, and you can change it in the file or in its window: **Save** changes only that section's lines, keeping your comments and the rest of the file as they are, and **Delete** removes the section. Every change is checked before it's saved (the file has to read back with exactly the new values), and a value the file can't hold, like one with ` ;` in it (that starts a comment there), is refused. Env values from the file stay on the server: the window shows them as `KEY=…`, and those lines keep their values when you save. A machine can't be renamed or deleted while a headline names it (`machine =`, `machines =`): change the headline first. To add a machine like one you already have, pick it under **Copy settings from** in the Add dialog, or press **Duplicate** in that machine's dialog: everything is copied except the name and the host. Machines added in the UI by older versions stay in the board's database (no *config* badge) and are changed there as before. `pytest-board.example.ini` documents every key.
 
 ```ini
 [machine:lab-a]
@@ -203,7 +214,7 @@ With `sync = yes`, the project (`--root`) is first copied to `workdir`, skipping
 
 **One test at a time per machine:** queued cards for a busy machine wait their turn, while cards for other machines go ahead.
 
-**One-time ssh setup** (as the user that runs the board, e.g. the systemd `User=`). The **Help setup** button in the top bar shows these steps with the commands filled in for a machine, ready to copy:
+**One-time ssh setup** (as the user that runs the board, e.g. the systemd `User=`). **Help setup** (at the bottom of the Machines column, or *How do I set up a key?* in a machine's window) shows these steps with the commands filled in for a machine, ready to copy:
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/pytest_board_ed25519 -N ''
 ssh-copy-id -i ~/.ssh/pytest_board_ed25519.pub tester@10.0.4.21
@@ -233,14 +244,16 @@ Open `http://<box>:8765`. With `--token`, the browser asks for a login: any user
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--root` | cwd | the project folder: where `pytest-board.ini` and `.pytest-board/` are by default, and what machines with `sync = yes` get a copy of |
+| `--root` | cwd | the project folder: where `pytest-board.ini` is by default, and what machines with `sync = yes` get a copy of |
 | `--host` / `--port` | 127.0.0.1 / 8765 | use `0.0.0.0` to allow other machines |
 | `--token` | none (or `PYTEST_BOARD_TOKEN`) | password protection |
-| `--data` | `<root>/.pytest-board` | SQLite DB, logs and junit reports |
+| `--data` | `.pytest-board` next to `server.py` | SQLite DB, logs and junit reports |
 | `--groups` | `<root>/pytest-board.ini` | headline + machine config file (optional) |
 | `--ssh` / `--rsync` | `ssh` / `rsync` | client binaries used for machines |
 | `--check-interval` | 120 | seconds between automatic machine health checks (0 = manual only) |
 | `--env-file` | `.env` next to the config file | variables for every run (see [.env files](#environment-variables-and-env-files)) |
+
+**Where the data goes:** the board keeps its database, logs and junit reports in `.pytest-board` in its own folder (next to `server.py`), wherever the project and `pytest-board.ini` are, so the user that runs the board needs to be able to write there (or pass `--data`). Older versions kept it in `<root>/.pytest-board`: a board that has its data there keeps using it, and says so when it starts. To move it, stop the board and move that folder next to `server.py`.
 
 `--pytest` and `--workers` are no longer used: tests run on the machines, and each machine has its own pytest command (`python =`). The board still accepts them (and logs a note), so an existing service file keeps working.
 
@@ -277,6 +290,30 @@ Differences from Linux:
 - **Open shell** works through ssh's own pipes: login must be key-based (it can't show a password prompt), and the terminal keeps the size it was opened with.
 - **Starting with Windows:** use Task Scheduler instead of the systemd file. *Create Task* → "Run whether user is logged on or not", trigger *At startup*, action *Start a program*: `py`, arguments `C:\pytest-board\server.py --root C:\work\my-project --token change-me`. The task's account is the one whose `.ssh` keys are used.
 
+### With Git Bash
+
+Git for Windows comes with its own `ssh` (`C:\Program Files\Git\usr\bin\ssh.exe`), so in Git Bash you don't need the Windows OpenSSH Client.
+
+- **Start the board** with `py`. In bash a backslash is an escape character, so write paths with forward slashes, in quotes (or as `/c/work/my-project`, which Git Bash turns into `C:/work/my-project` for Windows programs):
+
+  ```bash
+  py "C:/pytest-board/server.py" --root "C:/work/my-project" --token change-me
+  ```
+
+- **Which ssh:** started from Git Bash, the board uses Git's `ssh` (it comes first on the `PATH` there); started from PowerShell or Task Scheduler, the Windows one. Both use the same folder, `~/.ssh` (`C:\Users\<you>\.ssh`; `~` in Git Bash is your Windows user folder), so keys, `config` and `known_hosts` are shared. To use the same one every time, name it: `--ssh "C:/Windows/System32/OpenSSH/ssh.exe"`.
+- **Setting up a key:** **Help setup** shows PowerShell commands on Windows. In Git Bash use these instead (fill in the user and host):
+
+  ```bash
+  ssh-keygen -t ed25519 -f ~/.ssh/pytest_board_ed25519 -N ''
+  cat ~/.ssh/pytest_board_ed25519.pub | ssh tester@10.0.4.21 \
+    'mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys'
+  ssh -i ~/.ssh/pytest_board_ed25519 -o BatchMode=yes tester@10.0.4.21 'python3 -m pytest --version'
+  ```
+
+  The second command asks for the machine's password one last time; the third must print the pytest version without asking anything. Then put `~/.ssh/pytest_board_ed25519` in the machine's *Private key file*.
+- **A venv for the board** (for the tests and the pre-push hook): `py -m venv venv`, then `venv/Scripts/pip install pytest`, and `venv/Scripts/python -m pytest tests`. On Windows only the config-file and page tests run; the others need POSIX tools and are left out.
+- **The pre-push hook** works as it is: Git for Windows runs hooks with its own `sh`, and the hook finds `venv/Scripts/python.exe`. Turn it on the same way: `git config core.hooksPath .githooks`.
+
 ## How the code is laid out
 
 `server.py` only starts the board; the board itself is the `pytest_board/` package next to it (copy both, plus
@@ -290,6 +327,7 @@ Differences from Linux:
 | `runner.py` | `Runner`: the queue (which card runs next, and where), the scheduler, a run from start to result |
 | `ssh.py`, `remote.py`, `sync.py`, `health.py` | the parts of `Runner` that talk to machines: ssh command lines and env layers; runs that go on on the machine by themselves (start, follow, reconnect, collect, tidy, Discover); copying the project; machine checks |
 | `config.py` | `pytest-board.ini`: headlines and `[machine:NAME]` sections |
+| `optscan.py` | the options a project's `conftest.py` files declare (read with `ast`, never run) |
 | `machines.py` | the machines from the config file plus the ones added in the UI |
 | `store.py` | the SQLite database: schema and upgrades of older `board.db` files |
 | `model.py`, `envfiles.py`, `cron.py`, `system.py` | rules for values (machines, branches, option sets), .env files, cron, OS details |
@@ -309,6 +347,15 @@ the "remote" command locally (and can simulate a network outage), a `screen`, an
 given. They cover the config file, the API's rules (rows, bindings, cards without a machine), and real runs: pass and
 fail outcomes, env layers, one test at a time per machine, Stop, a network drop and a board restart during a run, git
 branches, and scheduling. They need Linux or macOS with `git`; `node`, if installed, also checks the page's script.
+
+**Before every push:** `.githooks/pre-push` runs the tests on each commit you push (unpacked into a temporary folder,
+so uncommitted changes don't count) and stops the push if they fail. Turn it on once per clone:
+
+```bash
+git config core.hooksPath .githooks && chmod +x .githooks/pre-push
+```
+
+`git push --no-verify` skips it for one push. It uses `venv/bin/python` (`venv/Scripts/python.exe` on Windows), else `python3`, or the Python in `PYTEST_BOARD_PYTHON`.
 
 ## Notes
 

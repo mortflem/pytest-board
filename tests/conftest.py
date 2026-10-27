@@ -101,7 +101,9 @@ class Board:
     def write_ini(self, text, wait=False):
         """Write pytest-board.ini ({work} and {python} are filled in). wait=True: until the board shows the change
         (its headlines, machines or config error look different from before)."""
-        seen = lambda: (lambda d: (d["groups"], d["machines"], d["groups_config"]["error"]))(self.api("GET", "/board"))
+        def seen():  # (not the options found in conftest.py files: those change by themselves)
+            d = self.api("GET", "/board")
+            return [dict(g, found=None) for g in d["groups"]], d["machines"], d["groups_config"]["error"]
         before = seen() if wait else None
         path = self.root / "pytest-board.ini"
         old = path.stat().st_mtime_ns if path.exists() else 0
@@ -118,6 +120,7 @@ class Board:
         self.log_file = open(self.base / "server.log", "ab")
         self.proc = subprocess.Popen(
             [sys.executable, str(REPO / "server.py"), "--root", str(self.root), "--port", str(self.port),
+             "--data", str(self.root / ".pytest-board"),  # (by default it would go next to server.py: the real one)
              "--ssh", f"{sys.executable} {self.fake_bin / 'ssh'}", "--check-interval", "0"],
             env=env, stdout=self.log_file, stderr=subprocess.STDOUT)
         self.until(self._up, "server start", timeout=20)

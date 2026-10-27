@@ -10,6 +10,7 @@ import subprocess
 import threading
 import time
 
+from . import optscan
 from .system import CHILD_KW, QUIET_KW
 
 
@@ -585,6 +586,103 @@ done
         if why:
             return {"ids": [], "error": why, "grp": grp, "machine": machine}
         return self._discover_remote(m, grp)
+
+    def scan_options(self, grp, machine=None):
+        """The command line options the headline's conftest.py files declare (see optscan.py), read on the machine
+        its tests run on (default: the headline's machine); for a machine with sync = yes, or without a machine,
+        from the project on this server. -> {"options", "files", "where", "machine", "dir", "scanned", "error",
+        "problems"}"""
+        g = self.groups.get(grp)
+        if not g:
+            return None
+        if not machine or machine == "local":
+            machine = self.resolve_machine({"grp": grp})[0]
+        m = self.machines.get(machine) if machine else None
+        out = {"options": [], "files": [], "machine": m["name"] if m else None, "dir": g["dir"],
+               "scanned": time.time(), "error": None, "problems": []}
+        if not m or m["sync"]:  # the project here is what runs (synced to the machine before each run)
+            here = self.root / g["dir"] if g["dir"] else self.root
+            out["where"] = str(here)
+            files = optscan.local_files(here, self.root)
+            if files is None:
+                out["error"] = f"the folder {here} isn't here" + ("" if m else " (and the headline has no machine)")
+                return out
+        else:
+            wd = self.remote_dir(m, g)
+            out["where"] = f"{self.dest(m)}:{wd}"
+            marker = "PB_CONFTEST_" + secrets.token_hex(8)
+            script = optscan.remote_script(self._rpath(wd), self._rpath(m["workdir"] or "~"), marker)
+            try:
+                r = subprocess.run(self.ssh_base(m) + [self.dest(m), "sh -s"], input=script.encode(),
+                                   capture_output=True, timeout=60, cwd=str(self.root), **QUIET_KW)
+            except subprocess.TimeoutExpired:
+                out["error"] = f"no answer from {m['name']} within a minute"
+                return out
+            except OSError as e:
+                out["error"] = f"cannot run {self.ssh_cmd[0]}: {e}"
+                return out
+            text = r.stdout.decode("utf-8", "replace")
+            if r.returncode == 255:
+                out["error"] = f"can't reach {m['name']}: {self._ssh_error(r.stderr) or 'ssh exit code 255'}"
+                return out
+            if "PB_NO_DIR" in text.splitlines():
+                out["error"] = f"the project folder {wd} doesn't exist on {m['name']}"
+                return out
+            files = optscan.split_files(text, marker)
+        out["files"] = [p for p, _ in files]
+        out["options"], out["problems"] = optscan.options_from_files(files)
+        return out
+
+    def branches(self, grp=None, machine=None):
+        """The git branches a card of this headline can run on there: the ones the project folder on the machine
+        knows from its remote (as of its last git fetch; a run fetches first) and its local ones.
+        -> {"branches": [...], "current": checked-out branch, "git": False when the folder isn't a git checkout,
+        "machine", "where", "error"}"""
+        if not machine or machine == "local":
+            machine = self.resolve_machine({"grp": grp})[0]
+        m = self.machines.get(machine) if machine else None
+        out = {"branches": [], "current": None, "git": None, "machine": m["name"] if m else None, "where": None,
+               "error": None}
+        if not m:
+            out["error"] = "no machine" if not machine else f"machine '{machine}' is not defined"
+            return out
+        if m["sync"]:
+            out.update(git=False, error=f"{m['name']} has sync = yes: its copy of the project has no git")
+            return out
+        wd = self.remote_dir(m, self.groups.get(grp))
+        out["where"] = f"{self.dest(m)}:{wd}"
+        script = (f"cd {self._rpath(wd)} 2>/dev/null || {{ echo PB_NO_DIR; exit 97; }}\n"
+                  "git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo PB_NO_GIT; exit 98; }\n"
+                  "printf 'PB_HEAD %s\\n' \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null)\"\n"
+                  "git for-each-ref --format='PB_REF %(refname)' refs/remotes refs/heads\n")
+        try:
+            r = subprocess.run(self.ssh_base(m) + [self.dest(m), "sh -s"], input=script.encode(), capture_output=True,
+                               timeout=30, cwd=str(self.root), **QUIET_KW)
+        except subprocess.TimeoutExpired:
+            out["error"] = f"no answer from {m['name']} within 30 seconds"
+            return out
+        except OSError as e:
+            out["error"] = f"cannot run {self.ssh_cmd[0]}: {e}"
+            return out
+        lines = r.stdout.decode("utf-8", "replace").splitlines()
+        if r.returncode == 255:
+            out["error"] = f"can't reach {m['name']}: {self._ssh_error(r.stderr) or 'ssh exit code 255'}"
+        elif "PB_NO_DIR" in lines:
+            out["error"] = f"the project folder {wd} doesn't exist on {m['name']}"
+        elif "PB_NO_GIT" in lines:
+            out.update(git=False, error=f"{wd} on {m['name']} isn't a git checkout")
+        else:
+            names = set()
+            for ln in lines:
+                if ln.startswith("PB_REF refs/heads/"):
+                    names.add(ln[len("PB_REF refs/heads/"):])
+                elif ln.startswith("PB_REF refs/remotes/"):
+                    name = ln[len("PB_REF refs/remotes/"):].split("/", 1)  # origin/feature/x -> feature/x
+                    if len(name) == 2 and name[1] != "HEAD":
+                        names.add(name[1])
+            head = next((ln[8:].strip() for ln in lines if ln.startswith("PB_HEAD ")), "")
+            out.update(git=True, branches=sorted(names), current=head if head and head != "HEAD" else None)
+        return out
 
     def _discover_remote(self, m, grp):
         item = {"grp": grp}

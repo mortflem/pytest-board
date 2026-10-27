@@ -1,0 +1,50 @@
+#!/bin/sh
+# pre-push: runs the board's tests (tests/) on every commit you push; if they fail, the push stops.
+#
+# It tests exactly what is pushed: each pushed commit is unpacked into a temporary folder, so changes you haven't
+# committed can't hide a failure. Takes about a minute.
+#
+#   turn it on (once per clone):   git config core.hooksPath .githooks && chmod +x .githooks/pre-push
+#   skip it for one push:          git push --no-verify
+#   use another Python:            PYTEST_BOARD_PYTHON=/path/to/python git push   (default: venv/bin/python, or
+#                                  venv/Scripts/python.exe on Windows, else python3; it needs pytest)
+
+TOP=$(git rev-parse --show-toplevel) || exit 1
+PY=${PYTEST_BOARD_PYTHON:-}
+if [ -z "$PY" ]; then
+  for c in "$TOP/venv/bin/python" "$TOP/venv/Scripts/python.exe"; do  # Linux/macOS venv, Windows venv (Git Bash)
+    if [ -x "$c" ]; then PY=$c; break; fi
+  done
+  [ -n "$PY" ] || PY=python3
+fi
+if ! "$PY" -c "import pytest" 2>/dev/null; then
+  echo "pre-push: pytest isn't installed for $PY (install it: \"$PY\" -m pip install pytest), so the tests can't run." >&2
+  echo "pre-push: push stopped. To push anyway: git push --no-verify" >&2
+  exit 1
+fi
+
+ZERO=0000000000000000000000000000000000000000
+tested=" "
+status=0
+# git tells the hook what it pushes, one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in "$ZERO"|"") continue;; esac           # deleting a branch: nothing to test
+  case "$tested" in *" $local_sha "*) continue;; esac        # same commit as another ref in this push
+  tested="$tested$local_sha "
+  short=$(git rev-parse --short "$local_sha")
+  if ! git cat-file -e "$local_sha:tests" 2>/dev/null; then
+    echo "pre-push: $short ($local_ref) has no tests/ folder: nothing to run"
+    continue
+  fi
+  dir=$(mktemp -d "${TMPDIR:-/tmp}/pytest-board-push.XXXXXX") || exit 1
+  git archive "$local_sha" | tar -x -C "$dir" || { rm -rf "$dir"; exit 1; }
+  echo "pre-push: testing $short ($local_ref -> $remote_ref) ..."
+  (cd "$dir" && PYTHONDONTWRITEBYTECODE=1 "$PY" -m pytest tests -q -p no:cacheprovider)
+  rc=$?
+  rm -rf "$dir"
+  if [ "$rc" -ne 0 ]; then
+    echo "pre-push: the tests failed on $short: push stopped (fix them, or: git push --no-verify)" >&2
+    status=1
+  fi
+done
+exit $status

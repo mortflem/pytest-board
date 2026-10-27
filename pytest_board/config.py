@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 
 from .envfiles import env_file_info, parse_env_lines, resolve_env_file
-from .model import MACHINE_NAME_RX, normalize_branch, normalize_machine, normalize_optset
+from .model import MACHINE_NAME_RX, OPTION_VALUE_RX, normalize_branch, normalize_machine, normalize_optset
 
 GROUP_COLORS = ["#3b5bdb", "#0f9d8a", "#c2410c", "#9333ea", "#be185d", "#0369a1", "#4d7c0f", "#a16207"]
 GROUP_KEY_RX = re.compile(r"^[A-Za-z0-9_.\- ]{1,64}$")
@@ -95,6 +95,8 @@ class Groups:
                 "tests": [ln.strip() for ln in s.get("tests", "").splitlines()
                           if ln.strip() and not ln.strip().startswith("#")],
                 "options": [],  # option sets offered when a test is put on the board: label | pytest args
+                # also offer the options the headline's conftest.py files declare (conftest_options = no: don't)
+                "conftest_options": s.get("conftest_options", "yes").strip().lower() not in ("no", "false", "off", "0"),
             }
             for ln in s.get("options", "").splitlines():
                 ln = ln.strip()
@@ -108,8 +110,15 @@ class Groups:
                 except ValueError as e:
                     problems.append(f"[{key}] options: {e}")
                     continue
+                # an option that takes a value has a <placeholder> where the value goes: --set_temperature <degrees>,
+                # --device=<name>. The page asks for the value when the option is ticked.
+                holes = OPTION_VALUE_RX.findall(args or "")
+                if len(holes) > 1:
+                    problems.append(f"[{key}] options: {args}: one <value> per option")
+                    continue
                 if args and all(o["args"] != args for o in g["options"]):
-                    g["options"].append({"label": label.strip() or args, "args": args})
+                    g["options"].append({"label": label.strip() or args, "args": args,
+                                         "value": holes[0] if holes else None})
             for name in re.split(r"[\s,]+", s.get("machines", "").strip()):
                 if not name or name in g["machines"]:
                     continue
@@ -157,5 +166,6 @@ class Groups:
             return [{"key": g["key"], "title": g["title"], "color": g["color"], "dir": g["dir"], "args": g["args"],
                      "machine": g["machine"], "machines": g["machines"], "env_keys": sorted(g["env"]),
                      "seed_count": len(g["tests"]),
-                     "options": g["options"], "env_file": env_file_info(g["env_file"]), "branch": g["branch"]}
+                     "options": g["options"], "conftest_options": g["conftest_options"],
+                     "env_file": env_file_info(g["env_file"]), "branch": g["branch"]}
                     for g in self.items]

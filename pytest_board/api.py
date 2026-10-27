@@ -8,7 +8,7 @@ import threading
 import time
 from pathlib import Path
 
-from . import BOARD_VERSION, page_stamp
+from . import BOARD_VERSION, inifile, page_stamp
 from .config import GROUP_KEY_RX
 from .cron import Cron
 from .envfiles import env_file_info
@@ -20,6 +20,7 @@ from .model import (
     SYSTEM_ONLY,
     ApiError,
     fill_hidden_env,
+    filled_optset,
     normalize_branch,
     normalize_machine,
     normalize_optset,
@@ -66,6 +67,15 @@ class App:
         self.token = token
         self.loopback_only = False  # set by main(): True when bound to localhost (enables the Host check)
         self.shells = Shells(runner)
+        self.ini_lock = threading.Lock()  # one change of pytest-board.ini at a time
+        # options found in each headline's conftest.py files (optscan.py), kept in the database between restarts
+        self.found = {}
+        for row in store.q("SELECT k, v FROM meta WHERE k LIKE 'conftest_options:%'"):
+            try:
+                self.found[row["k"].split(":", 1)[1]] = json.loads(row["v"])
+            except ValueError:
+                pass
+        self.scanning = False
         self.routes = []
         R = self.route
         R("GET", r"/api/board", self.board)
@@ -89,6 +99,8 @@ class App:
         R("GET", r"/api/runs/(\d+)/junit", self.run_junit)
         R("POST", r"/api/runs/(\d+)/attach", self.run_attach)  # a terminal in the run's screen session
         R("GET", r"/api/discover", self.discover)
+        R("GET", r"/api/branches", self.branches)  # the git branches a headline's folder on a machine knows
+        R("POST", r"/api/scan-options", self.scan_options)  # options from a headline's conftest.py files
         R("POST", r"/api/machines", self.machine_create)
         R("POST", r"/api/machines/check-all", self.machines_check_all)
         R("PATCH", r"/api/machines/([A-Za-z0-9_.\-]+)", self.machine_update)
@@ -142,9 +154,60 @@ class App:
         while True:
             try:
                 self.reload_groups()
+                self.auto_scan()
             except Exception as e:
                 print("headline reload error:", e, file=sys.stderr)
             time.sleep(2)
+
+    # ---- options from the headlines' conftest.py files
+    def _keep_found(self, key, entry):
+        self.found[key] = entry
+        with self.s.lock:
+            self.s.x("INSERT OR REPLACE INTO meta(k, v) VALUES(?, ?)", (f"conftest_options:{key}", json.dumps(entry)))
+            self.s.version += 1
+
+    def scan_options(self, q, body):
+        """Read the options in a headline's conftest.py files again ({"grp": key, "machine": name}: on that machine;
+        default: the headline's machine). The option dialog asks for this when it opens."""
+        key = str(body.get("grp") or "")
+        g = next((x for x in self.r.groups.public() if x["key"] == key), None)
+        if not g:
+            raise ApiError(404, "no such headline")
+        if not g["conftest_options"]:
+            raise ApiError(409, f"conftest_options = no for {key} in pytest-board.ini")
+        machine = str(body.get("machine") or "") or None
+        if machine and not self.r.machines.get(machine):
+            raise ApiError(404, "no such machine")
+        entry = self.r.scan_options(key, machine)
+        self._keep_found(key, entry)
+        return entry
+
+    def auto_scan(self):
+        """Looks at the conftest.py files of headlines it hasn't looked at yet (or whose dir = changed), one at a
+        time in the background; a look that failed (machine offline, ...) is tried again after 10 minutes."""
+        if self.scanning:
+            return
+        now, todo = time.time(), []
+        for g in self.r.groups.public():
+            e = self.found.get(g["key"])
+            if g["conftest_options"] and (not e or e.get("dir") != g["dir"]
+                                          or (e.get("error") and now - e.get("scanned", 0) > 600)):
+                todo.append(g["key"])
+        if not todo:
+            return
+        self.scanning = True
+
+        def work():
+            try:
+                for key in todo:
+                    entry = self.r.scan_options(key)
+                    if entry:
+                        self._keep_found(key, entry)
+            except Exception as e:
+                print("conftest.py options:", e, file=sys.stderr)
+            finally:
+                self.scanning = False
+        threading.Thread(target=work, name="conftest-options", daemon=True).start()
 
     # ---- board
     def board(self, q, body):
@@ -177,7 +240,8 @@ class App:
             "columns": COLUMNS,
             "cards": cards,
             "tests": tests,
-            "groups": self.r.groups.public(),
+            "groups": [dict(g, found=self.found.get(g["key"]) if g["conftest_options"] else None)
+                       for g in self.r.groups.public()],
             "machines": self.machines_public(),
             "groups_config": {
                 "path": str(self.r.groups.path) if self.r.groups.path else None,
@@ -305,28 +369,94 @@ class App:
             raise ApiError(404, "no such machine")
         return row
 
+    # ---- machines in pytest-board.ini: Add writes a [machine:NAME] section there; Save and Delete change it
+    def _ini_change(self, edit, name, expect):
+        """Change pytest-board.ini with edit(text) -> new text, check that machine `name` then reads back as
+        `expect` (None: gone), save, and load it. Nothing is written when the check fails."""
+        path = self.r.groups.path
+        if not path:
+            raise ApiError(409, "the board has no config file to keep machines in")
+        with self.ini_lock:
+            try:
+                text = path.read_text(encoding="utf-8") if path.exists() else inifile.NEW_FILE
+            except (OSError, UnicodeDecodeError) as e:
+                raise ApiError(500, f"can't read {path}: {e}")
+            new = edit(text)
+            try:
+                got = inifile.parse_machine(new, name, self.r.groups.base_dir())
+            except Exception as e:  # configparser errors, invalid values
+                raise ApiError(500, f"{path.name} would not read back correctly ({e}); nothing was changed")
+            if expect is None and got is not None or expect is not None and (
+                    got is None or not inifile.same(got, expect)[0]):
+                diff = "gone" if got is None else ", ".join(inifile.same(got, expect)[1]) if expect else "still there"
+                raise ApiError(500, f"{path.name} would not read back as intended ({diff}); nothing was changed")
+            try:
+                inifile.save(path, new)
+            except OSError as e:
+                raise ApiError(500, f"can't write {path}: {e}")
+        self.reload_groups()
+
+    def _config_machine(self, name):
+        return next((m for m in self.r.groups.machines if m["name"] == name), None)
+
+    def _named_by_headlines(self, name):
+        return [g["key"] for g in self.r.groups.items if g["machine"] == name or name in g["machines"]]
+
     def machine_create(self, q, body):
+        """A new machine: a [machine:NAME] section at the end of pytest-board.ini."""
         if body.get("env_from"):  # a copy of another machine ("Copy settings from" / Duplicate)
             src = self.r.machines.get(str(body["env_from"]))
             if not src:
                 raise ApiError(400, f"can't copy settings from unknown machine '{body['env_from']}'")
             body = dict(body, env=fill_hidden_env(body.get("env"), src["env"]))
-        m = normalize_machine(body, body.get("name"), "ui", base_dir=self.r.groups.base_dir())
+        m = normalize_machine(body, body.get("name"), "config", base_dir=self.r.groups.base_dir())
         if self.r.machines.get(m["name"]):
             raise ApiError(409, f"a machine called '{m['name']}' already exists")
-        pos = (self.s.one("SELECT MAX(position) p FROM machines") or {}).get("p") or 0
-        now = time.time()
-        self.s.x("INSERT INTO machines(name, host, user, port, identity, workdir, python, sync, env, "
-                 "ssh_options, notes, env_file, remote_env_file, position, created, updated) "
-                 "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                 (m["name"], m["host"], m["user"], m["port"], m["identity"], m["workdir"], m["python"],
-                  int(m["sync"]), m["env_text"], m["ssh_options"], m["notes"], m["env_file"], m["remote_env_file"],
-                  pos + 1, now, now))
+        try:
+            inifile.check_values(m)
+        except ValueError as e:
+            raise ApiError(400, str(e))
+        self._ini_change(lambda t: inifile.add_section(t, m["name"], m), m["name"], m)
         threading.Thread(target=self.r._check_safe, args=(self.r.machines.get(m["name"]),), daemon=True).start()
-        return {"ok": True, "name": m["name"]}
+        return {"ok": True, "name": m["name"], "source": "config"}
+
+    def _config_machine_update(self, cur, body):
+        name = cur["name"]
+        merged = {k: cur[k] for k in MACHINE_FIELDS if k != "env"}
+        merged["env"] = cur["env_text"]
+        merged.update({k: v for k, v in body.items() if k in MACHINE_FIELDS})
+        merged["env"] = fill_hidden_env(merged.get("env"), cur["env"])  # KEY=… lines keep their values
+        new_name = str(body.get("name") or name).strip()
+        m = normalize_machine(merged, new_name, "config", base_dir=self.r.groups.base_dir())
+        if new_name != name:
+            if self.r.machines.get(new_name):
+                raise ApiError(409, f"a machine called '{new_name}' already exists")
+            if self.r.busy.get(name):
+                raise ApiError(409, "can't rename a machine while it is running tests")
+            users = self._named_by_headlines(name)
+            if users:
+                raise ApiError(409, f"{', '.join(users)} in {self.r.groups.path.name} names {name} (machine = / "
+                                    f"machines =): rename it there, in the file")
+        try:
+            inifile.check_values(m)
+        except ValueError as e:
+            raise ApiError(400, str(e))
+        self._ini_change(lambda t: inifile.update_section(t, name, new_name, m), new_name, m)
+        if new_name != name:
+            with self.s.lock:
+                for t in ("cards", "tests"):
+                    self.s.x(f"UPDATE {t} SET machine=? WHERE machine=?", (new_name, name))
+                self.s.x("DELETE FROM machines WHERE name=?", (new_name,))  # an old copy from the database
+            self.r.machines.status.pop(name, None)
+        threading.Thread(target=self.r._check_safe, args=(self.r.machines.get(new_name),), daemon=True).start()
+        self.r.wake.set()  # a changed machine may let queued cards start
+        return {"ok": True, "name": new_name}
 
     def machine_update(self, q, body, name):
-        row = self._machine_row(name)
+        cur = self._config_machine(str(name))
+        if cur:
+            return self._config_machine_update(cur, body)
+        row = self._machine_row(name)  # a machine added in the UI by an older version: kept in the database
         merged = dict(row, **{k: v for k, v in body.items() if k in MACHINE_FIELDS})
         new_name = str(body.get("name") or row["name"]).strip()
         m = normalize_machine(merged, new_name, "ui", row["id"], base_dir=self.r.groups.base_dir())
@@ -349,6 +479,24 @@ class App:
         return {"ok": True, "name": new_name}
 
     def machine_delete(self, q, body, name):
+        cur = self._config_machine(str(name))
+        if cur:
+            name = cur["name"]
+            if self.r.busy.get(name):
+                raise ApiError(409, "this machine is running tests; stop them first")
+            users = self._named_by_headlines(name)
+            if users:
+                raise ApiError(409, f"{', '.join(users)} in {self.r.groups.path.name} names {name} (machine = / "
+                                    f"machines =): change that first")
+            self._ini_change(lambda t: inifile.remove_section(t, name), name, None)
+            with self.s.lock:
+                self.s.x("DELETE FROM machines WHERE name=?", (name,))  # an old copy would come back otherwise
+                n = 0
+                for t in ("cards", "tests"):
+                    n += self.s.one(f"SELECT COUNT(*) n FROM {t} WHERE machine=?", (name,))["n"]
+                    self.s.x(f"UPDATE {t} SET machine=NULL WHERE machine=?", (name,))
+            self.r.machines.status.pop(name, None)
+            return {"ok": True, "reset": n}
         row = self._machine_row(name)
         if self.r.busy.get(row["name"]):
             raise ApiError(409, "this machine is running tests; stop them first")
@@ -466,9 +614,9 @@ class App:
                 sets = parse_optsets(body["optsets"])
                 self.s.x("UPDATE tests SET optsets=? WHERE id=?", (json.dumps(sets) if sets else None, tid))  # next time
                 if body.get("combine"):  # one card with all of them ({"combine": true}, what the UI sends)
-                    sets = [normalize_optset(" ".join(x for x in sets if x))]
+                    sets = [filled_optset(" ".join(x for x in sets if x))]
             else:
-                sets = [normalize_optset(body.get("optset"))]
+                sets = [filled_optset(body.get("optset"))]
         except ValueError as e:
             raise ApiError(400, str(e))
         # extra pytest arguments for every copy ({"extra_args": "--set_temperature 0 10 20"}): they go into each
@@ -514,21 +662,25 @@ class App:
         return t
 
     def cards_clear(self, q, body):
-        """Remove finished cards from the board (their run history stays). Optional filters: "machine" (one row
-        of the board: the cards that run there; "" or null = the "No machine" row) and "grp" (one headline; null =
-        cards without one)."""
-        statuses = [s for s in (body.get("statuses") or ["passed", "failed"]) if s in ("passed", "failed", "backlog")]
+        """Remove the cards in some columns from the board ({"statuses": ["passed", "failed"]}, the default); their
+        run history stays. Running cards are stopped first. Optional filters: "machine" (one row of the board: the
+        cards that run there; "" or null = the "No machine" row) and "grp" (one headline; null = cards without one)."""
+        statuses = [s for s in (body.get("statuses") or ["passed", "failed"]) if s in COLUMNS]
         if not statuses:
             raise ApiError(400, "nothing to clear")
         only_machine = "machine" in body
         machine = str(body.get("machine") or "") or None
         only_grp = "grp" in body
         grp = _grp(body) if only_grp else None
-        with self.s.lock:
-            ids = [c["id"] for c in self.s.q(f"SELECT id, machine, grp FROM cards WHERE status IN "
-                                              f"({','.join('?' * len(statuses))})", statuses)
-                   if (not only_machine or self.r.resolve_machine(c)[0] == machine)
-                   and (not only_grp or c["grp"] == grp)]
+        with self.s.lock:  # (the runner starts queued cards under this lock too: none starts halfway through)
+            cards = [c for c in self.s.q(f"SELECT id, status, machine, grp FROM cards WHERE status IN "
+                                         f"({','.join('?' * len(statuses))})", statuses)
+                     if (not only_machine or self.r.resolve_machine(c)[0] == machine)
+                     and (not only_grp or c["grp"] == grp)]
+            for c in cards:
+                if c["status"] == "running":
+                    self.r.stop(c["id"])  # its run ends as cancelled, in the library test's history
+            ids = [c["id"] for c in cards]
             for i in range(0, len(ids), 500):
                 chunk = ids[i:i + 500]
                 self.s.x(f"DELETE FROM cards WHERE id IN ({','.join('?' * len(chunk))})", chunk)
@@ -548,7 +700,7 @@ class App:
             out["machine"] = self._machine_ref(body)
         if "optset" in body:
             try:
-                out["optset"] = normalize_optset(body["optset"])
+                out["optset"] = filled_optset(body["optset"])
             except ValueError as e:
                 raise ApiError(400, str(e))
         if "branch" in body:
@@ -622,7 +774,7 @@ class App:
         if "optset" in body:
             c = self.s.one("SELECT status, optset FROM cards WHERE id=?", (cid,))
             try:
-                new = normalize_optset(body["optset"])
+                new = filled_optset(body["optset"])
             except ValueError as e:
                 raise ApiError(400, str(e))
             if c and c["status"] == "running" and new != c["optset"]:
@@ -688,13 +840,22 @@ class App:
                     upd["machine"] = machine
             if "optset" in body:  # dropped on an option-set group
                 try:
-                    optset = normalize_optset(body["optset"])
+                    optset = filled_optset(body["optset"])
                 except ValueError as e:
                     raise ApiError(400, str(e))
                 if optset != c.get("optset"):
                     if c["status"] == "running":
                         raise ApiError(409, "card is running — stop it first")
                     upd["optset"] = optset
+            if "branch" in body:  # asked for when it's put in Queued or Scheduled (null: the headline's branch)
+                try:
+                    branch = normalize_branch(body["branch"])
+                except ValueError as e:
+                    raise ApiError(400, str(e))
+                if branch != c.get("branch"):
+                    if c["status"] == "running":
+                        raise ApiError(409, "card is running — stop it first")
+                    upd["branch"] = branch
             if status in ("scheduled", "queued") and not self.r.resolve_machine({**c, **upd})[0]:
                 raise ApiError(409, NO_MACHINE)
             if "machine" in upd or status in ("scheduled", "queued"):
@@ -795,6 +956,12 @@ class App:
 
     def discover(self, q, body):
         return self.r.discover(q.get("grp") or None, q.get("machine") or None)
+
+    def branches(self, q, body):
+        machine = q.get("machine") or None
+        if machine and not self.r.machines.get(machine):
+            raise ApiError(404, "no such machine")
+        return self.r.branches(q.get("grp") or None, machine)
 
     # ---- interactive ssh shell on a machine ("Open shell" in the machine dialog)
     def shell_open(self, q, body, name):
